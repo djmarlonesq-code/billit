@@ -707,10 +707,10 @@ function saveBillEdit(id) {
 function renderSubs() {
   var list=document.getElementById('subList');list.innerHTML='';
   var pid=nowPeriod();
-
-  // Summary line
   var now=new Date();
   var curMonth=now.getMonth()+1;
+
+  // Summary line
   var monthlySubs=subscriptions.filter(function(s){return s.cycle!=='yearly';});
   var yearlyDueThisMonth=subscriptions.filter(function(s){return s.cycle==='yearly'&&s.month===curMonth;});
   var monthlyTotal=monthlySubs.reduce(function(t,s){return t+s.amount;},0)+yearlyDueThisMonth.reduce(function(t,s){return t+s.amount;},0);
@@ -721,14 +721,13 @@ function renderSubs() {
 
   if(!subscriptions.length){list.innerHTML='<div class="empty">No subscriptions yet.</div>';return;}
 
-  // Sort: monthly by day, yearly at bottom (unless due this month)
+  // Sort: monthly by day, yearly at bottom unless due this month
   var sorted=subscriptions.slice().sort(function(a,b){
     var aYearly=a.cycle==='yearly'&&a.month!==curMonth;
     var bYearly=b.cycle==='yearly'&&b.month!==curMonth;
     if(aYearly&&!bYearly)return 1;
     if(!aYearly&&bYearly)return -1;
-    var aDay=a.day||31; var bDay=b.day||31;
-    return aDay-bDay;
+    return (a.day||31)-(b.day||31);
   });
 
   sorted.forEach(function(s){
@@ -737,91 +736,64 @@ function renderSubs() {
     var sp=subPay[pid][s.id];
     var cycleLbl=s.cycle==='yearly'?'Yearly':'Monthly';
     var dueLbl=s.cycle==='yearly'&&s.month?'Due '+MONTHS[s.month]+(s.day?' '+s.day:'')+( s.year?' '+s.year:''):(s.day?'Bills on '+s.day+'th':'');
-    var subBodyId='sbody_'+s.id;
+
+    // Collapsed row
     var row=document.createElement('div');
     row.className='sub-row'+(sp.paid?' paid':'');
-    row.style.cssText='flex-direction:column;align-items:stretch;cursor:pointer;';
-    row.innerHTML=
-      '<div>'+
-        '<div class="sub-name">'+s.name+'</div>'+
-        '<div class="sub-meta">'+cycleLbl+(dueLbl?' &middot; '+dueLbl:'')+'</div>'+
-        (sp.paid&&sp.date?'<div class="sub-paid-dt">&#10003; Paid '+sp.date+'</div>':'')+
-      '</div>'+
-      '<div class="sub-right">'+
-        '<div class="sub-amt">'+fm(s.amount)+'</div>'+
-        '<button class="sub-pay'+(sp.paid?' paid':'')+'" onclick="toggleSubPay('+pid+',\''+s.id+'\')">'+(sp.paid?'&#10003; Paid':'Mark Paid')+'</button>'+
-        '<div style="display:flex;gap:6px;">'+
-          '<button class="lnk-btn" id="editSubBtn_'+s.id+'">edit</button>'+
-          '<button class="lnk-btn" onclick="deleteSub(\''+s.id+'\')"}>remove</button>'+
-        '</div>'+
-      '</div>';
+    row.style.flexDirection='column';
+
+    // Header — always visible, tap to expand
+    var hdr=document.createElement('div');
+    hdr.style.cssText='display:flex;justify-content:space-between;align-items:center;cursor:pointer;';
+
+    var left=document.createElement('div');
+    var nameEl=document.createElement('div');nameEl.className='sub-name';nameEl.textContent=s.name;
+    var metaEl=document.createElement('div');metaEl.className='sub-meta';
+    metaEl.textContent=cycleLbl+(dueLbl?' · '+dueLbl:'')+(sp.paid?' · ✓ Paid '+sp.date:'');
+    left.appendChild(nameEl);left.appendChild(metaEl);
+
+    var right=document.createElement('div');
+    right.style.cssText='display:flex;align-items:center;gap:8px;flex-shrink:0;';
+    var amtEl=document.createElement('div');amtEl.className='sub-amt';amtEl.textContent=fm(s.amount);
+    var chevEl=document.createElement('span');chevEl.id='sChev_'+s.id;
+    chevEl.style.cssText='color:var(--muted);font-size:12px;transition:transform 0.25s;';chevEl.textContent='▾';
+    right.appendChild(amtEl);right.appendChild(chevEl);
+
+    hdr.appendChild(left);hdr.appendChild(right);
+    row.appendChild(hdr);
+
+    // Body — hidden by default
+    var body=document.createElement('div');
+    body.id='sbody_'+s.id;
+    body.style.cssText='display:none;padding-top:10px;border-top:1px solid var(--border);margin-top:10px;';
+
+    var actDiv=document.createElement('div');
+    actDiv.style.cssText='display:flex;gap:8px;flex-wrap:wrap;align-items:center;';
+
+    var payBtn=document.createElement('button');
+    payBtn.className='sub-pay'+(sp.paid?' paid':'');
+    payBtn.textContent=sp.paid?'✓ Paid':'Mark Paid';
+
+    var editBtn=document.createElement('button');editBtn.className='lnk-btn';editBtn.textContent='edit';
+    var delBtn=document.createElement('button');delBtn.className='lnk-btn';delBtn.textContent='remove';
+
+    actDiv.appendChild(payBtn);actDiv.appendChild(editBtn);actDiv.appendChild(delBtn);
+    body.appendChild(actDiv);
+
+    var editContainer=document.createElement('div');
+    editContainer.id='editSubForm_'+s.id;
+    body.appendChild(editContainer);
+    row.appendChild(body);
     list.appendChild(row);
-    var editCont=document.createElement('div');
-    editCont.id='editSubForm_'+s.id;
-    editCont.style.cssText='margin-bottom:8px;';
-    list.appendChild(editCont);
-    (function(sub,cont){
-      var btn=document.getElementById('editSubBtn_'+sub.id);
-      if(btn)btn.onclick=function(){showEditSub(sub.id,cont);};
-    })(s,editCont);
+
+    // Wire events with closure
+    (function(sub,pb,eb,db,ec){
+      hdr.onclick=function(){toggleSubBody('sbody_'+sub.id,sub.id);};
+      pb.onclick=function(ev){ev.stopPropagation();toggleSubPay(pid,sub.id);};
+      eb.onclick=function(ev){ev.stopPropagation();showEditSub(sub.id,ec);};
+      db.onclick=function(ev){ev.stopPropagation();deleteSub(sub.id);};
+    })(s,payBtn,editBtn,delBtn,editContainer);
   });
-}
-
-function showEditSub(id,container){
-  if(!container)container=document.getElementById('editSubForm_'+id);
-  if(!container)return;
-  if(container.innerHTML!==''){container.innerHTML='';return;}
-  var s=subscriptions.find(function(x){return x.id===id;});
-  if(!s)return;
-  var cycleOpts='<option value="monthly"'+(s.cycle==='monthly'?' selected':'')+'>Monthly</option><option value="yearly"'+(s.cycle==='yearly'?' selected':'')+'>Yearly</option>';
-  var monthOpts=[1,2,3,4,5,6,7,8,9,10,11,12].map(function(m){return '<option value="'+m+'"'+(s.month===m?' selected':'')+'>'+MONTHS[m]+'</option>';}).join('');
-  container.innerHTML=
-    '<div class="edit-form" style="margin-top:8px;">'+
-      '<div class="ef-title">Edit Subscription</div>'+
-      '<div class="frow">'+
-        '<div class="fld"><label class="flbl">Name</label><input class="finp" id="esN_'+id+'" type="text" value="'+s.name+'"></div>'+
-        '<div class="fld"><label class="flbl">Amount ($)</label><input class="finp" id="esA_'+id+'" type="number" step="0.01" value="'+s.amount.toFixed(2)+'" onkeyup="autoDecimal(this)"></div>'+
-      '</div>'+
-      '<div class="frow">'+
-        '<div class="fld"><label class="flbl">Cycle</label><select class="fsel" id="esCy_'+id+'" onchange="onEditSubCycleChange(this)">'+cycleOpts+'</select></div>'+
-        '<div class="fld"><label class="flbl">Billing Day</label><input class="finp" id="esD_'+id+'" type="number" min="1" max="31" value="'+(s.day||'')+'"></div>'+
-      '</div>'+
-      '<div class="frow" id="esMonthWrap_'+id+'" style="'+(s.cycle==='yearly'?'':'display:none;')+'">'+
-        '<div class="fld"><label class="flbl">Billing Month</label><select class="fsel" id="esMo_'+id+'">'+monthOpts+'</select></div>'+
-        '<div class="fld"><label class="flbl">Due Year</label><input class="finp" id="esYr_'+id+'" type="number" min="2024" max="2035" value="'+(s.year||new Date().getFullYear())+'" placeholder="e.g. 2026"></div>'+
-      '</div>'+
-      '<div class="ef-btns">'+
-        '<button class="btn btn-g btn-sm" id="esSave_'+id+'">Save</button>'+
-        '<button class="btn btn-sm" style="background:none;color:var(--muted);border:1px solid var(--border);" id="esCancel_'+id+'">Cancel</button>'+
-      '</div>'+
-    '</div>';
-  document.getElementById('esSave_'+id).onclick=function(){saveSubEdit(id,container);};
-  document.getElementById('esCancel_'+id).onclick=function(){container.innerHTML='';};
-}
-
-function onEditSubCycleChange(sel){
-  var cy=sel.value;
-  var selectId=sel.id;
-  var id=selectId.replace('esCy_','');
-  var wrap=document.getElementById('esMonthWrap_'+id);
-  if(wrap)wrap.style.display=cy==='yearly'?'':'none';
-}
-
-function saveSubEdit(id,container){
-  var idx=subscriptions.findIndex(function(s){return s.id===id;});
-  if(idx<0)return;
-  var name=document.getElementById('esN_'+id).value.trim();
-  var amount=parseFloat(document.getElementById('esA_'+id).value)||0;
-  var cycle=document.getElementById('esCy_'+id).value;
-  var day=parseInt(document.getElementById('esD_'+id).value)||null;
-  var month=cycle==='yearly'?parseInt(document.getElementById('esMo_'+id).value)||null:null;
-  var year=cycle==='yearly'?parseInt(document.getElementById('esYr_'+id).value)||null:null;
-  if(!name||!amount){toast('Enter name and amount');return;}
-  subscriptions[idx].name=name;subscriptions[idx].amount=amount;
-  subscriptions[idx].cycle=cycle;subscriptions[idx].day=day;
-  subscriptions[idx].month=month;subscriptions[idx].year=year;
-  if(container)container.innerHTML='';
-  save();renderSubs();renderStats();toast('Subscription updated!');
 }
 
 function toggleSubBody(id){
