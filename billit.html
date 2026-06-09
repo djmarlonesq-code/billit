@@ -115,9 +115,9 @@ html,body{height:100%;width:100%;background:var(--bg);color:var(--text);font-fam
 .edit-form{margin-top:10px;background:var(--bg);border:1px solid var(--accent4);border-radius:10px;padding:12px;}
 .ef-title{font-size:9px;letter-spacing:0.12em;text-transform:uppercase;color:var(--accent4);font-family:'DM Mono',monospace;margin-bottom:10px;}
 .ef-btns{display:flex;gap:8px;margin-top:8px;}
-.sub-row{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:13px 14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:12px;}
+.sub-row{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:10px 12px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;gap:8px;}
 .sub-row.paid{border-color:rgba(0,229,160,0.3);}
-.sub-name{font-size:13px;font-weight:600;}
+.sub-name{font-size:13px;font-weight:700;}
 .sub-meta{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);margin-top:2px;}
 .sub-paid-dt{font-family:'DM Mono',monospace;font-size:10px;color:var(--accent);margin-top:3px;}
 .sub-right{display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0;}
@@ -850,63 +850,91 @@ function renderExpenses() {
   document.getElementById('ePNum').textContent='Pay Period '+(pid+1);
   var list=document.getElementById('expList');list.innerHTML='';
   var exps=getExpensesForPeriod(pid);
+
   if(!exps.length){list.innerHTML='<div class="empty">No expenses logged yet.<br>Tap Log Expense above.</div>';return;}
+
   var total=exps.reduce(function(s,e){return s+e.amount;},0);
   var hdr=document.createElement('div');
-  hdr.style.cssText='font-family:\'DM Mono\',monospace;font-size:11px;color:var(--muted);margin-bottom:10px;';
+  hdr.style.cssText='font-size:11px;color:var(--muted);margin-bottom:10px;';
   hdr.textContent=exps.length+' expense'+(exps.length!==1?'s':'')+' - '+fm(total)+' total';
   list.appendChild(hdr);
-  var reversed=exps.slice().reverse();
-  var editContainers={};
-  reversed.forEach(function(e,idx){
+
+  // Sort newest first
+  var sorted=exps.slice().sort(function(a,b){
+    return (b.dateISO||'').localeCompare(a.dateISO||'');
+  });
+
+  sorted.forEach(function(e,idx){
+    var expBodyId='expBody_'+e.id;
     var row=document.createElement('div');
     row.className='exp-item';
-    row.innerHTML=
-      '<div class="exp-top">'+
-        '<div>'+
-          '<div class="exp-name">'+e.name+'</div>'+
-          '<div class="exp-meta">'+(e.merchant?e.merchant+' &middot; ':'')+e.cat+' &middot; '+e.date+'</div>'+
-        '</div>'+
-        '<div style="text-align:right;flex-shrink:0;">'+
-          '<div class="exp-amt">'+fm(e.amount)+'</div>'+
-          '<div class="exp-actions">'+
-            '<button class="lnk-btn" id="editEBtn_'+e.id+'">edit</button>'+
-            '<button class="lnk-btn" onclick="deleteExp(\''+e.id+'\')">remove</button>'+
-          '</div>'+
-        '</div>'+
-      '</div>'+
-      '<div id="editEForm_'+e.id+'"></div>';
+
+    // Header row (always visible) - tap to expand
+    var topDiv=document.createElement('div');
+    topDiv.className='exp-top';
+    topDiv.style.cursor='pointer';
+    topDiv.onclick=function(){toggleExpBody(expBodyId,e.id);};
+
+    var leftDiv=document.createElement('div');
+    var nameEl=document.createElement('div');nameEl.className='exp-name';nameEl.textContent=e.name;
+    var metaEl=document.createElement('div');metaEl.className='exp-meta';
+    metaEl.textContent=(e.merchant?e.merchant+' · ':'')+e.cat+' · '+e.date;
+    leftDiv.appendChild(nameEl);leftDiv.appendChild(metaEl);
+
+    var rightDiv=document.createElement('div');
+    rightDiv.style.cssText='text-align:right;flex-shrink:0;display:flex;align-items:center;gap:8px;';
+    var amtEl=document.createElement('div');amtEl.className='exp-amt';amtEl.textContent=fm(e.amount);
+    var chevEl=document.createElement('span');chevEl.id='eChev_'+e.id;
+    chevEl.style.cssText='color:var(--muted);font-size:12px;';chevEl.textContent='▾';
+    rightDiv.appendChild(amtEl);rightDiv.appendChild(chevEl);
+
+    topDiv.appendChild(leftDiv);topDiv.appendChild(rightDiv);
+    row.appendChild(topDiv);
+
+    // Expandable body
+    var bodyDiv=document.createElement('div');
+    bodyDiv.id=expBodyId;
+    bodyDiv.style.cssText='display:none;padding-top:8px;border-top:1px solid var(--border);margin-top:8px;';
+
+    var actDiv=document.createElement('div');
+    actDiv.style.cssText='display:flex;gap:8px;margin-bottom:4px;';
+    var editBtn=document.createElement('button');editBtn.className='lnk-btn';editBtn.textContent='edit';
+    var delBtn=document.createElement('button');delBtn.className='lnk-btn';delBtn.textContent='remove';
+    actDiv.appendChild(editBtn);actDiv.appendChild(delBtn);
+    bodyDiv.appendChild(actDiv);
+
+    var formDiv=document.createElement('div');formDiv.id='editEForm_'+e.id;
+    bodyDiv.appendChild(formDiv);
+    row.appendChild(bodyDiv);
+
     if(idx>=3){row.classList.add('exp-old');row.style.display='none';}
     list.appendChild(row);
-    editContainers[e.id]=e;
+
+    // Wire buttons using closure
+    (function(exp,ed,dd,fd){
+      ed.onclick=function(ev){ev.stopPropagation();showEditExp(exp.id,pid);};
+      dd.onclick=function(ev){ev.stopPropagation();deleteExp(exp.id);};
+    })(e,editBtn,delBtn,formDiv);
   });
-  if(reversed.length>3){
+
+  // Show more / collapse
+  if(sorted.length>3){
     var showBtn=document.createElement('button');
     showBtn.className='show-more-btn';
-    showBtn.textContent='Show '+(reversed.length-3)+' older expense'+(reversed.length-3!==1?'s':'');
+    showBtn.textContent='Show '+(sorted.length-3)+' older expense'+(sorted.length-3!==1?'s':'');
     var collapseBtn=document.createElement('button');
-    collapseBtn.className='show-more-btn';
+    collapseBtn.className='show-more-btn';collapseBtn.style.display='none';
     collapseBtn.textContent='Collapse older expenses';
-    collapseBtn.style.display='none';
     showBtn.onclick=function(){
       list.querySelectorAll('.exp-old').forEach(function(r){r.style.display='';});
-      showBtn.style.display='none';
-      collapseBtn.style.display='';
+      showBtn.style.display='none';collapseBtn.style.display='';
     };
     collapseBtn.onclick=function(){
       list.querySelectorAll('.exp-old').forEach(function(r){r.style.display='none';});
-      collapseBtn.style.display='none';
-      showBtn.style.display='';
+      collapseBtn.style.display='none';showBtn.style.display='';
     };
-    list.appendChild(showBtn);
-    list.appendChild(collapseBtn);
+    list.appendChild(showBtn);list.appendChild(collapseBtn);
   }
-  sorted.forEach(function(e){
-    var editBtn=document.getElementById('editEBtn_'+e.id);
-    if(editBtn){
-      (function(exp){editBtn.onclick=function(ev){ev.stopPropagation();showEditExp(exp.id,pid);};})(e);
-    }
-  });
 }
 
 function toggleExpBody(bodyId,eid){
@@ -1095,6 +1123,8 @@ document.querySelectorAll('.nav-btn').forEach(function(btn){
     btn.classList.add('active');
     document.getElementById('page-'+btn.dataset.page).classList.add('active');
     document.getElementById('content').scrollTop=0;
+    // Re-render stats when tab opens so canvas has correct width
+    if(btn.dataset.page==='stats') setTimeout(renderStats, 50);
   });
 });
 
