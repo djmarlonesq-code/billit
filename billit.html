@@ -618,6 +618,17 @@ function showEditBill(id) {
   document.getElementById('ebCancel_'+id).onclick=function(){container.innerHTML='';};
 }
 
+function ebOnTypeChange(id){
+  var t=document.getElementById('ebT_'+id).value;
+  var wrap=document.getElementById('ebSplitWrap_'+id);
+  if(wrap)wrap.style.display=t==='manualsplit'?'grid':'none';
+}
+function ebCalcPay2(id){
+  var total=parseFloat(document.getElementById('ebA_'+id).value)||0;
+  var p1=parseFloat(document.getElementById('ebP1_'+id).value)||0;
+  var p2el=document.getElementById('ebP2_'+id);
+  if(p2el)p2el.value=Math.max(0,total-p1).toFixed(2);
+}
 function saveBillEdit(id) {
   var idx=bills.findIndex(function(b){return b.id===id;});
   if(idx<0)return;
@@ -1033,6 +1044,8 @@ document.querySelectorAll('.sec-hd').forEach(function(hd){
   hd.addEventListener('click',function(){
     var t=document.getElementById(hd.dataset.target);if(!t)return;
     var c=t.classList.toggle('hidden');hd.classList.toggle('closed',c);
+    // Re-render cat list when settings section is expanded
+    if(hd.dataset.target==='secSettings'&&!c)renderCatList();
   });
 });
 
