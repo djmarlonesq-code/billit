@@ -83,7 +83,7 @@ html,body{height:100%;width:100%;background:var(--bg);color:var(--text);font-fam
 .btn-b{background:rgba(123,140,255,0.12);color:var(--accent4);border:1px solid rgba(123,140,255,0.25);}
 .btn-sm{padding:6px 12px;font-size:11px;width:auto;margin-top:0;border-radius:8px;}
 .bill-row{background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:8px;overflow:hidden;transition:border-color 0.2s;}
-.bill-row.done{border-color:rgba(0,229,160,0.3);}
+.bill-row.done{border-color:rgba(0,229,160,0.5);background:rgba(0,229,160,0.04);}
 .bill-row.auto{border-left:3px solid var(--accent4);box-sizing:border-box;}
 .br-hd{padding:13px 14px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;}
 .br-hd:hover{background:var(--surface2);}
@@ -104,7 +104,7 @@ html,body{height:100%;width:100%;background:var(--bg);color:var(--text);font-fam
 .pay-pills{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;}
 .pill-btn{flex:1;min-width:120px;border:1px solid var(--border);border-radius:10px;padding:10px 12px;cursor:pointer;transition:all 0.2s;background:var(--surface2);text-align:left;}
 .pill-btn:active{opacity:0.8;}
-.pill-btn.paid{background:rgba(0,229,160,0.1);border-color:rgba(0,229,160,0.3);}
+.pill-btn.paid{background:rgba(0,229,160,0.18);border-color:rgba(0,229,160,0.6);box-shadow:0 0 0 1px rgba(0,229,160,0.2);}
 .pill-btn.auto-p{background:rgba(123,140,255,0.1);border-color:rgba(123,140,255,0.3);}
 .pill-lbl{font-size:9px;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);font-family:'DM Mono',monospace;margin-bottom:4px;}
 .pill-amt{font-family:'DM Mono',monospace;font-size:14px;font-weight:500;}
@@ -228,8 +228,14 @@ canvas{display:block;width:100%;}
         <div class="fld"><label class="flbl">Category</label><select class="fsel" id="nBCat"></select></div>
       </div>
       <div class="frow">
-        <div class="fld"><label class="flbl">Payment Type</label><select class="fsel" id="nBType" onchange="onBTypeChange()"><option value="split">Split (bi-weekly)</option><option value="auto">Auto-Withdrawal</option><option value="manual">Manual Monthly</option><option value="autowdsplit">Auto WD Split</option></select></div>
+        <div class="fld"><label class="flbl">Payment Type</label><select class="fsel" id="nBType" onchange="onBTypeChange()"><option value="split">Split (bi-weekly)</option><option value="auto">Auto-Withdrawal</option><option value="manual">Manual Monthly</option><option value="autowdsplit">Auto WD Split</option><option value="manualsplit">Manual Split Amt</option></select></div>
         <div class="fld" id="nBDayWrap" style="display:none"><label class="flbl">Auto Day of Month</label><input class="finp" id="nBDay" type="number" min="1" max="31" placeholder="e.g. 5"></div>
+      </div>
+      <div class="frow" id="nBSplitWrap" style="display:none">
+        <div class="fld"><label class="flbl">Payment 1 ($)</label><input class="finp" id="nBPay1" type="number" step="0.01" placeholder="0.00" onkeyup="autoDecimal(this);calcPay2()"></div>
+        <div class="fld"><label class="flbl">Payment 2 ($) — auto</label><input class="finp" id="nBPay2" type="number" step="0.01" placeholder="0.00" readonly style="opacity:0.6"></div>
+      </div>
+      <div class="frow" style="display:none" id="nBSplitDummy">
       </div>
       <button class="btn btn-g" id="addBillBtn">+ Add Bill</button>
     </div>
@@ -253,6 +259,7 @@ canvas{display:block;width:100%;}
       <div class="frow">
         <div class="fld"><label class="flbl">Billing Day</label><input class="finp" id="nSDay" type="number" min="1" max="31" placeholder="e.g. 15"></div>
         <div class="fld" id="nSMonthWrap" style="display:none"><label class="flbl">Billing Month</label><select class="fsel" id="nSMonth"><option value="1">January</option><option value="2">February</option><option value="3">March</option><option value="4">April</option><option value="5">May</option><option value="6">June</option><option value="7">July</option><option value="8">August</option><option value="9">September</option><option value="10">October</option><option value="11">November</option><option value="12">December</option></select></div>
+        <div class="fld" id="nSYearWrap" style="display:none"><label class="flbl">Due Year</label><input class="finp" id="nSYear" type="number" min="2024" max="2035" placeholder="e.g. 2026"></div>
       </div>
       <button class="btn btn-g" id="addSubBtn">+ Add Subscription</button>
     </div>
@@ -438,7 +445,10 @@ function ensureBP(pid,bid) {
 }
 function getPaidAmt(pid,b) {
   ensureBP(pid,b.id); var p=billPay[pid][b.id];
-  return b.type==='split' ? ((p.p1?b.perPay:0)+(p.p2?b.perPay:0)) : (p.p1?b.perPay:0);
+  if(b.type==='manualsplit'){
+    return (p.p1?(b.pay1Amt||b.perPay):0)+(p.p2?(b.pay2Amt||b.perPay):0);
+  }
+  return (b.type==='split'||b.type==='autowdsplit') ? ((p.p1?b.perPay:0)+(p.p2?b.perPay:0)) : (p.p1?b.perPay:0);
 }
 function getTotalPaid(pid) {
   var t=0;
@@ -482,14 +492,14 @@ function renderBills() {
   if (!bills.length) { list.innerHTML='<div class="empty">No bills yet.<br>Tap Add a Bill above.</div>'; return; }
   bills.forEach(function(b) {
     var pid=curPeriod; ensureBP(pid,b.id); var p=billPay[pid][b.id];
-    var isSplit=b.type==='split'||b.type==='autowdsplit', isAuto=b.type==='auto'||b.type==='autowdsplit', isAutoSplit=b.type==='autowdsplit';
+    var isSplit=b.type==='split'||b.type==='autowdsplit'||b.type==='manualsplit', isAuto=b.type==='auto'||b.type==='autowdsplit', isAutoSplit=b.type==='autowdsplit', isManualSplit=b.type==='manualsplit';
     var ta=isSplit?b.perPay*2:b.perPay, pa=getPaidAmt(pid,b), pct=ta>0?Math.min(pa/ta*100,100):0;
     var isDone=isSplit?(p.p1&&p.p2):p.p1, col=catColor(b.cat);
     var statusTxt, statusCol;
-    if(isDone){statusTxt='Done';statusCol='var(--accent)';}
+    if(isDone){statusTxt='&#10003; Paid';statusCol='var(--accent)';}
     else if(isSplit&&p.p1&&!p.p2){statusTxt='1 of 2'+(p.p1d?' &middot; '+p.p1d:'');statusCol='var(--accent3)';}
     else{statusTxt='Unpaid';statusCol='var(--muted)';}
-    var cycleLbl=b.type==='autowdsplit'?' &middot; Auto WD Split':b.type==='auto'?' &middot; Auto WD':b.type==='split'?' &middot; Split':' &middot; Manual';
+    var cycleLbl=b.type==='autowdsplit'?' &middot; Auto WD Split':b.type==='manualsplit'?' &middot; Manual Split':b.type==='auto'?' &middot; Auto WD':b.type==='split'?' &middot; Split':' &middot; Manual';
     var perLbl='per month';
     var bodyId='bb_'+b.id+'_'+pid, chevId='bc_'+b.id+'_'+pid;
     var row=document.createElement('div');
@@ -585,7 +595,8 @@ function showEditBill(id) {
     {v:'split',l:'Split (bi-weekly)'},
     {v:'auto',l:'Auto-Withdrawal'},
     {v:'manual',l:'Manual Monthly'},
-    {v:'autowdsplit',l:'Auto WD Split'}
+    {v:'autowdsplit',l:'Auto WD Split'},
+    {v:'manualsplit',l:'Manual Split Amt'}
   ].map(function(t){return '<option value="'+t.v+'"'+(t.v===b.type?' selected':'')+'>'+t.l+'</option>';}).join('');
   container.innerHTML=
     '<div class="edit-form">'+
@@ -616,7 +627,9 @@ function saveBillEdit(id) {
   var type=document.getElementById('ebT_'+id).value;
   if(!name||!amount){toast('Enter name and amount');return;}
   bills[idx].name=name;bills[idx].amount=amount;
-  bills[idx].perPay=(type==='split'||type==='autowdsplit')?+(amount/2).toFixed(2):amount;
+  var newPerPay=(type==='split'||type==='autowdsplit')?+(amount/2).toFixed(2):amount;
+  if(type==='manualsplit'){ newPerPay=bills[idx].pay1Amt||+(amount/2).toFixed(2); }
+  bills[idx].perPay=newPerPay;
   bills[idx].cat=cat;bills[idx].type=type;
   save();renderBills();renderBudget();renderStats();
   toast('Bill updated!');
@@ -625,15 +638,40 @@ function saveBillEdit(id) {
 function renderSubs() {
   var list=document.getElementById('subList');list.innerHTML='';
   var pid=nowPeriod();
+
+  // Summary line
+  var now=new Date();
+  var curMonth=now.getMonth()+1;
+  var monthlySubs=subscriptions.filter(function(s){return s.cycle!=='yearly';});
+  var yearlyDueThisMonth=subscriptions.filter(function(s){return s.cycle==='yearly'&&s.month===curMonth;});
+  var monthlyTotal=monthlySubs.reduce(function(t,s){return t+s.amount;},0)+yearlyDueThisMonth.reduce(function(t,s){return t+s.amount;},0);
+  var summaryEl=document.createElement('div');
+  summaryEl.style.cssText='font-size:11px;color:var(--muted);margin-bottom:12px;padding:0 2px;';
+  summaryEl.innerHTML=subscriptions.length+' subscription'+(subscriptions.length!==1?'s':'')+' &nbsp;&middot;&nbsp; <span style="color:var(--accent3)">'+fm(monthlyTotal)+'</span>/mo';
+  list.appendChild(summaryEl);
+
   if(!subscriptions.length){list.innerHTML='<div class="empty">No subscriptions yet.</div>';return;}
-  subscriptions.forEach(function(s){
+
+  // Sort: monthly by day, yearly at bottom (unless due this month)
+  var sorted=subscriptions.slice().sort(function(a,b){
+    var aYearly=a.cycle==='yearly'&&a.month!==curMonth;
+    var bYearly=b.cycle==='yearly'&&b.month!==curMonth;
+    if(aYearly&&!bYearly)return 1;
+    if(!aYearly&&bYearly)return -1;
+    var aDay=a.day||31; var bDay=b.day||31;
+    return aDay-bDay;
+  });
+
+  sorted.forEach(function(s){
     if(!subPay[pid])subPay[pid]={};
     if(!subPay[pid][s.id])subPay[pid][s.id]={paid:false,date:''};
     var sp=subPay[pid][s.id];
     var cycleLbl=s.cycle==='yearly'?'Yearly':'Monthly';
     var dueLbl=s.cycle==='yearly'&&s.month?'Due '+MONTHS[s.month]+(s.day?' '+s.day:'')+( s.year?' '+s.year:''):(s.day?'Bills on '+s.day+'th':'');
+    var subBodyId='sbody_'+s.id;
     var row=document.createElement('div');
     row.className='sub-row'+(sp.paid?' paid':'');
+    row.style.cssText='flex-direction:column;align-items:stretch;cursor:pointer;';
     row.innerHTML=
       '<div>'+
         '<div class="sub-name">'+s.name+'</div>'+
@@ -717,6 +755,17 @@ function saveSubEdit(id,container){
   save();renderSubs();renderStats();toast('Subscription updated!');
 }
 
+function toggleSubBody(id){
+  var body=document.getElementById(id);
+  if(!body)return;
+  var open=body.style.display==='none';
+  body.style.display=open?'block':'none';
+  // rotate chevron
+  var sid=id.replace('sbody_','');
+  var chev=document.getElementById('sChev_'+sid);
+  if(chev)chev.style.transform=open?'rotate(180deg)':'';
+}
+
 function toggleSubPay(pid,subId){
   if(!subPay[pid])subPay[pid]={};
   if(!subPay[pid][subId])subPay[pid][subId]={paid:false,date:''};
@@ -783,12 +832,21 @@ function renderExpenses() {
     list.appendChild(showBtn);
     list.appendChild(collapseBtn);
   }
-  reversed.forEach(function(e){
+  sorted.forEach(function(e){
     var editBtn=document.getElementById('editEBtn_'+e.id);
     if(editBtn){
-      editBtn.onclick=function(){showEditExp(e.id,pid);};
+      (function(exp){editBtn.onclick=function(ev){ev.stopPropagation();showEditExp(exp.id,pid);};})(e);
     }
   });
+}
+
+function toggleExpBody(bodyId,eid){
+  var body=document.getElementById(bodyId);
+  if(!body)return;
+  var open=body.style.display==='none';
+  body.style.display=open?'block':'none';
+  var chev=document.getElementById('eChev_'+eid);
+  if(chev)chev.style.transform=open?'rotate(180deg)':'';
 }
 
 function showEditExp(id,pid){
@@ -979,8 +1037,18 @@ document.querySelectorAll('.sec-hd').forEach(function(hd){
 });
 
 document.getElementById('maskBtn').addEventListener('click',function(){revealed=!revealed;applyMask();});
-function onBTypeChange(){var t=document.getElementById('nBType').value;document.getElementById('nBDayWrap').style.display=t==='auto'?'block':'none';}
-function onSubCycleChange(){var c=document.getElementById('nSCycle').value;document.getElementById('nSMonthWrap').style.display=c==='yearly'?'block':'none';}
+function onBTypeChange(){
+  var t=document.getElementById('nBType').value;
+  document.getElementById('nBDayWrap').style.display=t==='auto'||t==='autowdsplit'?'block':'none';
+  document.getElementById('nBSplitWrap').style.display=t==='manualsplit'?'grid':'none';
+}
+function calcPay2(){
+  var total=parseFloat(document.getElementById('nBAmt').value)||0;
+  var p1=parseFloat(document.getElementById('nBPay1').value)||0;
+  var p2=Math.max(0,total-p1);
+  document.getElementById('nBPay2').value=p2.toFixed(2);
+}
+function onSubCycleChange(){var c=document.getElementById('nSCycle').value;var show=c==='yearly'?'block':'none';document.getElementById('nSMonthWrap').style.display=show;document.getElementById('nSYearWrap').style.display=show;}
 
 document.getElementById('addBillHd').addEventListener('click',function(){var b=document.getElementById('addBillBd');var o=b.classList.toggle('open');document.getElementById('addBillHnt').textContent=o?'tap to close':'tap to add';});
 document.getElementById('addSubHd').addEventListener('click',function(){var b=document.getElementById('addSubBd');var o=b.classList.toggle('open');document.getElementById('addSubHnt').textContent=o?'tap to close':'tap to add';});
@@ -994,7 +1062,15 @@ document.getElementById('addBillBtn').addEventListener('click',function(){
   var autoDay=parseInt(document.getElementById('nBDay').value)||null;
   if(!name||!amount){toast('Enter name and amount');return;}
   var perPay=(type==='split'||type==='autowdsplit')?+(amount/2).toFixed(2):amount;
-  bills.push({id:uid(),name:name,amount:amount,perPay:perPay,cat:cat,type:type,autoDay:autoDay});
+  var pay1=type==='manualsplit'?parseFloat(document.getElementById('nBPay1').value)||0:null;
+  var pay2=type==='manualsplit'?Math.max(0,+(amount-pay1).toFixed(2)):null;
+  if(type==='manualsplit'){
+    if(!pay1||pay1<=0){toast('Enter Payment 1 amount');return;}
+    if(Math.abs(pay1+pay2-amount)>0.01){toast('Payments must add up to total');return;}
+    perPay=pay1;
+  }
+  bills.push({id:uid(),name:name,amount:amount,perPay:perPay,pay1Amt:pay1,pay2Amt:pay2,cat:cat,type:type,autoDay:autoDay});
+  document.getElementById('nBPay1').value='';document.getElementById('nBPay2').value='';
   document.getElementById('nBName').value='';document.getElementById('nBAmt').value='';
   document.getElementById('addBillBd').classList.remove('open');document.getElementById('addBillHnt').textContent='tap to add';
   save();renderBills();renderBudget();renderStats();toast(name+' added!');
@@ -1006,9 +1082,10 @@ document.getElementById('addSubBtn').addEventListener('click',function(){
   var cycle=document.getElementById('nSCycle').value;
   var day=parseInt(document.getElementById('nSDay').value)||null;
   var month=cycle==='yearly'?parseInt(document.getElementById('nSMonth').value)||null:null;
+  var year=cycle==='yearly'?parseInt(document.getElementById('nSYear').value)||null:null;
   if(!name||!amount){toast('Enter name and amount');return;}
-  subscriptions.push({id:uid(),name:name,amount:amount,cycle:cycle,day:day,month:month});
-  document.getElementById('nSName').value='';document.getElementById('nSAmt').value='';
+  subscriptions.push({id:uid(),name:name,amount:amount,cycle:cycle,day:day,month:month,year:year});
+  document.getElementById('nSName').value='';document.getElementById('nSAmt').value='';document.getElementById('nSDay').value='';document.getElementById('nSYear').value='';
   document.getElementById('addSubBd').classList.remove('open');document.getElementById('addSubHnt').textContent='tap to add';
   save();renderSubs();renderStats();toast(name+' added!');
 });
