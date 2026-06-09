@@ -807,6 +807,99 @@ function toggleSubBody(id){
   if(chev)chev.style.transform=open?'rotate(180deg)':'';
 }
 
+function showEditSub(id,container){
+  if(!container)container=document.getElementById('editSubForm_'+id);
+  if(!container)return;
+  if(container.innerHTML!==''){container.innerHTML='';return;}
+  var s=subscriptions.find(function(x){return x.id===id;});
+  if(!s)return;
+
+  var wrap=document.createElement('div');
+  wrap.className='edit-form';wrap.style.marginTop='10px';
+
+  var title=document.createElement('div');title.className='ef-title';title.textContent='Edit Subscription';
+  wrap.appendChild(title);
+
+  // Name + Amount
+  var r1=document.createElement('div');r1.className='frow';
+  var fN=document.createElement('div');fN.className='fld';
+  var lN=document.createElement('label');lN.className='flbl';lN.textContent='Name';
+  var iN=document.createElement('input');iN.className='finp';iN.type='text';iN.id='esN_'+id;iN.value=s.name;
+  fN.appendChild(lN);fN.appendChild(iN);
+  var fA=document.createElement('div');fA.className='fld';
+  var lA=document.createElement('label');lA.className='flbl';lA.textContent='Amount ($)';
+  var iA=document.createElement('input');iA.className='finp';iA.type='number';iA.step='0.01';iA.id='esA_'+id;iA.value=s.amount.toFixed(2);
+  iA.onkeyup=function(){autoDecimal(this);};
+  fA.appendChild(lA);fA.appendChild(iA);
+  r1.appendChild(fN);r1.appendChild(fA);wrap.appendChild(r1);
+
+  // Cycle + Day
+  var r2=document.createElement('div');r2.className='frow';
+  var fCy=document.createElement('div');fCy.className='fld';
+  var lCy=document.createElement('label');lCy.className='flbl';lCy.textContent='Cycle';
+  var sCy=document.createElement('select');sCy.className='fsel';sCy.id='esCy_'+id;
+  [{v:'monthly',l:'Monthly'},{v:'yearly',l:'Yearly'}].forEach(function(o){
+    var opt=document.createElement('option');opt.value=o.v;opt.textContent=o.l;
+    if(o.v===s.cycle)opt.selected=true;sCy.appendChild(opt);
+  });
+  sCy.onchange=function(){
+    var cy=sCy.value;
+    var mw=document.getElementById('esMonthWrap_'+id);
+    if(mw)mw.style.display=cy==='yearly'?'grid':'none';
+  };
+  fCy.appendChild(lCy);fCy.appendChild(sCy);
+  var fD=document.createElement('div');fD.className='fld';
+  var lD=document.createElement('label');lD.className='flbl';lD.textContent='Billing Day';
+  var iD=document.createElement('input');iD.className='finp';iD.type='number';iD.min='1';iD.max='31';iD.id='esD_'+id;iD.value=s.day||'';
+  fD.appendChild(lD);fD.appendChild(iD);
+  r2.appendChild(fCy);r2.appendChild(fD);wrap.appendChild(r2);
+
+  // Month + Year (yearly only)
+  var r3=document.createElement('div');r3.className='frow';r3.id='esMonthWrap_'+id;
+  r3.style.display=s.cycle==='yearly'?'grid':'none';
+  var fMo=document.createElement('div');fMo.className='fld';
+  var lMo=document.createElement('label');lMo.className='flbl';lMo.textContent='Billing Month';
+  var sMo=document.createElement('select');sMo.className='fsel';sMo.id='esMo_'+id;
+  [1,2,3,4,5,6,7,8,9,10,11,12].forEach(function(m){
+    var opt=document.createElement('option');opt.value=m;opt.textContent=MONTHS[m];
+    if(m===s.month)opt.selected=true;sMo.appendChild(opt);
+  });
+  fMo.appendChild(lMo);fMo.appendChild(sMo);
+  var fYr=document.createElement('div');fYr.className='fld';
+  var lYr=document.createElement('label');lYr.className='flbl';lYr.textContent='Due Year';
+  var iYr=document.createElement('input');iYr.className='finp';iYr.type='number';iYr.min='2024';iYr.max='2035';iYr.id='esYr_'+id;iYr.value=s.year||new Date().getFullYear();
+  fYr.appendChild(lYr);fYr.appendChild(iYr);
+  r3.appendChild(fMo);r3.appendChild(fYr);wrap.appendChild(r3);
+
+  // Buttons
+  var btns=document.createElement('div');btns.className='ef-btns';
+  var bSave=document.createElement('button');bSave.className='btn btn-g btn-sm';bSave.textContent='Save';
+  bSave.onclick=function(){saveSubEdit(id,container);};
+  var bCancel=document.createElement('button');bCancel.className='btn btn-sm';
+  bCancel.style.cssText='background:none;color:var(--muted);border:1px solid var(--border);';
+  bCancel.textContent='Cancel';bCancel.onclick=function(){container.innerHTML='';};
+  btns.appendChild(bSave);btns.appendChild(bCancel);wrap.appendChild(btns);
+
+  container.appendChild(wrap);
+}
+
+function saveSubEdit(id,container){
+  var idx=subscriptions.findIndex(function(s){return s.id===id;});
+  if(idx<0)return;
+  var name=document.getElementById('esN_'+id).value.trim();
+  var amount=parseFloat(document.getElementById('esA_'+id).value)||0;
+  var cycle=document.getElementById('esCy_'+id).value;
+  var day=parseInt(document.getElementById('esD_'+id).value)||null;
+  var month=cycle==='yearly'?parseInt(document.getElementById('esMo_'+id).value)||null:null;
+  var year=cycle==='yearly'?parseInt(document.getElementById('esYr_'+id).value)||null:null;
+  if(!name||!amount){toast('Enter name and amount');return;}
+  subscriptions[idx].name=name;subscriptions[idx].amount=amount;
+  subscriptions[idx].cycle=cycle;subscriptions[idx].day=day;
+  subscriptions[idx].month=month;subscriptions[idx].year=year;
+  if(container)container.innerHTML='';
+  save();renderSubs();renderStats();toast('Subscription updated!');
+}
+
 function toggleSubPay(pid,subId){
   if(!subPay[pid])subPay[pid]={};
   if(!subPay[pid][subId])subPay[pid][subId]={paid:false,date:''};
