@@ -1030,7 +1030,7 @@ function showEditExp(id,pid){
       '</div>'+
       '<div class="frow tri">'+
         '<div class="fld"><label class="flbl">Amount ($)</label><input class="finp" id="eeA_'+id+'" type="number" step="0.01" value="'+e.amount.toFixed(2)+'" onkeyup="autoDecimal(this)"></div>'+
-        '<div class="fld"><label class="flbl">Date</label><input class="finp" id="eeD_'+id+'" type="text" value="'+e.date+'" placeholder="Jun 5"></div>'+
+        '<div class="fld"><label class="flbl">Date</label><input class="finp" id="eeD_'+id+'" type="date" value="'+(e.dateISO||fmtISO(new Date()))+'" style="color-scheme:dark"></div>'+
         '<div class="fld"><label class="flbl">Category</label><select class="fsel" id="eeCt_'+id+'">'+catOpts+'</select></div>'+
       '</div>'+
       '<div class="ef-btns">'+
@@ -1048,16 +1048,16 @@ function saveExpEdit(id,pid){
   var name=document.getElementById('eeN_'+id).value.trim();
   var merchant=document.getElementById('eeM_'+id).value.trim();
   var amount=parseFloat(document.getElementById('eeA_'+id).value)||0;
-  var dateStr=document.getElementById('eeD_'+id).value.trim();
+  var dateISO=document.getElementById('eeD_'+id).value.trim();
   var cat=document.getElementById('eeCt_'+id).value;
   if(!name||!amount){toast('Enter description and amount');return;}
   expenses[idx].name=name;expenses[idx].merchant=merchant;
   expenses[idx].amount=amount;expenses[idx].cat=cat;
-  if(dateStr){
-    expenses[idx].date=dateStr;
-    // Try to parse and update dateISO
-    var parsed=parseDate(dateStr);
-    if(!isNaN(parsed)) expenses[idx].dateISO=fmtISO(parsed);
+  if(dateISO){
+    expenses[idx].dateISO=dateISO;
+    // Update friendly display date
+    var d=new Date(dateISO+'T00:00:00');
+    if(!isNaN(d))expenses[idx].date=fmtShort(d);
   }
   save();renderExpenses();renderBudget();renderStats();
   toast('Updated! Moved to correct period.');
