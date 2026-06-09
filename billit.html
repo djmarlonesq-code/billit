@@ -924,9 +924,9 @@ function renderExpenses() {
   hdr.textContent=exps.length+' expense'+(exps.length!==1?'s':'')+' - '+fm(total)+' total';
   list.appendChild(hdr);
 
-  // Sort: primary by date oldest first, secondary by insertion order last entered first
+  // Sort: primary by date newest first, secondary by last entered first
   var sorted=exps.slice().sort(function(a,b){
-    var dateCmp=(a.dateISO||'').localeCompare(b.dateISO||'');
+    var dateCmp=(b.dateISO||'').localeCompare(a.dateISO||'');
     if(dateCmp!==0)return dateCmp;
     // Same date: last entered first
     return exps.indexOf(b)-exps.indexOf(a);
