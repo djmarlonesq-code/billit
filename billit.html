@@ -479,7 +479,7 @@ function renderBudget() {
   bar.style.background=pct<20?'#ff6b6b':pct<50?'#ffd166':'#00e5a0';
   var ol=document.getElementById('ovList'); ol.innerHTML='';
   bills.forEach(function(b){
-    var pa=getPaidAmt(pid,b), ta=b.type==='split'?b.perPay*2:b.perPay, pct2=ta>0?Math.min(pa/ta*100,100):0, col=catColor(b.cat);
+    var pa=getPaidAmt(pid,b), ta=b.type==='manualsplit'?(b.pay1Amt||0)+(b.pay2Amt||0):b.type==='split'||b.type==='autowdsplit'?b.perPay*2:b.perPay, pct2=ta>0?Math.min(pa/ta*100,100):0, col=catColor(b.cat);
     ol.innerHTML+='<div class="ov-row"><div class="ov-top"><div class="ov-name">'+b.name+'</div><div class="ov-amt" style="color:'+col+'">'+fm(pa)+' / '+fm(ta)+'</div></div><div class="pbar-bg"><div class="pbar-fill" style="width:'+pct2.toFixed(1)+'%;background:'+col+'"></div></div></div>';
   });
   applyMask();
@@ -493,7 +493,7 @@ function renderBills() {
   bills.forEach(function(b) {
     var pid=curPeriod; ensureBP(pid,b.id); var p=billPay[pid][b.id];
     var isSplit=b.type==='split'||b.type==='autowdsplit'||b.type==='manualsplit', isAuto=b.type==='auto'||b.type==='autowdsplit', isAutoSplit=b.type==='autowdsplit', isManualSplit=b.type==='manualsplit';
-    var ta=isSplit?b.perPay*2:b.perPay, pa=getPaidAmt(pid,b), pct=ta>0?Math.min(pa/ta*100,100):0;
+    var ta=isManualSplit?(b.pay1Amt||0)+(b.pay2Amt||0):isSplit?b.perPay*2:b.perPay, pa=getPaidAmt(pid,b), pct=ta>0?Math.min(pa/ta*100,100):0;
     var isDone=isSplit?(p.p1&&p.p2):p.p1, col=catColor(b.cat);
     var statusTxt, statusCol;
     if(isDone){statusTxt='&#10003; Paid';statusCol='var(--accent)';}
@@ -506,17 +506,19 @@ function renderBills() {
     row.className='bill-row'+(isDone?' done':'')+(isAuto?' auto':'');
     var pillsHtml='<div class="pay-pills">';
     if(isSplit){
+      var amt1=isManualSplit&&b.pay1Amt?b.pay1Amt:b.perPay;
+      var amt2=isManualSplit&&b.pay2Amt?b.pay2Amt:b.perPay;
       pillsHtml+=
         '<button class="pill-btn'+(p.p1?' paid':'')+'" onclick="toggleBP('+pid+',\''+b.id+'\',1)">'+
           '<div class="pill-lbl">Payment 1 of 2</div>'+
-          '<div class="pill-amt">'+fm(b.perPay)+'</div>'+
+          '<div class="pill-amt">'+fm(amt1)+'</div>'+
           (p.p1d?'<div class="pill-date">'+p.p1d+'</div>':'')+
           '<div class="pill-status" style="color:'+(p.p1?'var(--accent)':'var(--muted)')+'">'+
             (p.p1?'&#10003; Paid':'Tap to mark paid')+'</div>'+
         '</button>'+
         '<button class="pill-btn'+(p.p2?' paid':'')+'" onclick="toggleBP('+pid+',\''+b.id+'\',2)">'+
           '<div class="pill-lbl">Payment 2 of 2</div>'+
-          '<div class="pill-amt">'+fm(b.perPay)+'</div>'+
+          '<div class="pill-amt">'+fm(amt2)+'</div>'+
           (p.p2d?'<div class="pill-date">'+p.p2d+'</div>':'')+
           '<div class="pill-status" style="color:'+(p.p2?'var(--accent)':'var(--muted)')+'">'+
             (p.p2?'&#10003; Paid':'Tap to mark paid')+'</div>'+
@@ -590,32 +592,79 @@ function showEditBill(id) {
   var container=document.getElementById('editBillForm_'+id);
   if(!container)return;
   if(container.innerHTML!==''){container.innerHTML='';return;}
-  var catOpts=categories.map(function(c){return '<option value="'+c+'"'+(c===b.cat?' selected':'')+'>'+c+'</option>';}).join('');
-  var typeOpts=[
+
+  var cats=categories;
+  var types=[
     {v:'split',l:'Split (bi-weekly)'},
     {v:'auto',l:'Auto-Withdrawal'},
     {v:'manual',l:'Manual Monthly'},
     {v:'autowdsplit',l:'Auto WD Split'},
     {v:'manualsplit',l:'Manual Split Amt'}
-  ].map(function(t){return '<option value="'+t.v+'"'+(t.v===b.type?' selected':'')+'>'+t.l+'</option>';}).join('');
-  container.innerHTML=
-    '<div class="edit-form">'+
-      '<div class="ef-title">Edit Bill</div>'+
-      '<div class="frow">'+
-        '<div class="fld"><label class="flbl">Name</label><input class="finp" id="ebN_'+id+'" type="text" value="'+b.name+'"></div>'+
-        '<div class="fld"><label class="flbl">Monthly Amt ($)</label><input class="finp" id="ebA_'+id+'" type="number" step="0.01" value="'+b.amount.toFixed(2)+'" onkeyup="autoDecimal(this)"></div>'+
-      '</div>'+
-      '<div class="frow">'+
-        '<div class="fld"><label class="flbl">Category</label><select class="fsel" id="ebC_'+id+'">'+catOpts+'</select></div>'+
-        '<div class="fld"><label class="flbl">Type</label><select class="fsel" id="ebT_'+id+'">'+typeOpts+'</select></div>'+
-      '</div>'+
-      '<div class="ef-btns">'+
-        '<button class="btn btn-g btn-sm" id="ebSave_'+id+'">Save</button>'+
-        '<button class="btn btn-sm" style="background:none;color:var(--muted);border:1px solid var(--border);" id="ebCancel_'+id+'">Cancel</button>'+
-      '</div>'+
-    '</div>';
-  document.getElementById('ebSave_'+id).onclick=function(){saveBillEdit(id);};
-  document.getElementById('ebCancel_'+id).onclick=function(){container.innerHTML='';};
+  ];
+
+  var wrap=document.createElement('div');
+  wrap.className='edit-form';
+  wrap.style.marginTop='10px';
+
+  var title=document.createElement('div');
+  title.className='ef-title';
+  title.textContent='Edit Bill';
+  wrap.appendChild(title);
+
+  // Row 1: Name + Amount
+  var r1=document.createElement('div');r1.className='frow';
+  var fName=document.createElement('div');fName.className='fld';
+  var lName=document.createElement('label');lName.className='flbl';lName.textContent='Name';
+  var iName=document.createElement('input');iName.className='finp';iName.type='text';iName.id='ebN_'+id;iName.value=b.name;
+  fName.appendChild(lName);fName.appendChild(iName);
+  var fAmt=document.createElement('div');fAmt.className='fld';
+  var lAmt=document.createElement('label');lAmt.className='flbl';lAmt.textContent='Monthly Amt ($)';
+  var iAmt=document.createElement('input');iAmt.className='finp';iAmt.type='number';iAmt.step='0.01';iAmt.id='ebA_'+id;iAmt.value=b.amount.toFixed(2);
+  iAmt.onkeyup=function(){autoDecimal(this);ebCalcPay2(id);};
+  fAmt.appendChild(lAmt);fAmt.appendChild(iAmt);
+  r1.appendChild(fName);r1.appendChild(fAmt);wrap.appendChild(r1);
+
+  // Row 2: Category + Type
+  var r2=document.createElement('div');r2.className='frow';
+  var fCat=document.createElement('div');fCat.className='fld';
+  var lCat=document.createElement('label');lCat.className='flbl';lCat.textContent='Category';
+  var sCat=document.createElement('select');sCat.className='fsel';sCat.id='ebC_'+id;
+  cats.forEach(function(c){var o=document.createElement('option');o.value=c;o.textContent=c;if(c===b.cat)o.selected=true;sCat.appendChild(o);});
+  fCat.appendChild(lCat);fCat.appendChild(sCat);
+  var fType=document.createElement('div');fType.className='fld';
+  var lType=document.createElement('label');lType.className='flbl';lType.textContent='Type';
+  var sType=document.createElement('select');sType.className='fsel';sType.id='ebT_'+id;
+  types.forEach(function(t){var o=document.createElement('option');o.value=t.v;o.textContent=t.l;if(t.v===b.type)o.selected=true;sType.appendChild(o);});
+  sType.onchange=function(){ebOnTypeChange(id);};
+  fType.appendChild(lType);fType.appendChild(sType);
+  r2.appendChild(fCat);r2.appendChild(fType);wrap.appendChild(r2);
+
+  // Row 3: Split amounts (shown only for manualsplit)
+  var r3=document.createElement('div');r3.className='frow';r3.id='ebSplitWrap_'+id;
+  r3.style.display=b.type==='manualsplit'?'grid':'none';
+  var fP1=document.createElement('div');fP1.className='fld';
+  var lP1=document.createElement('label');lP1.className='flbl';lP1.textContent='Payment 1 ($)';
+  var iP1=document.createElement('input');iP1.className='finp';iP1.type='number';iP1.step='0.01';iP1.id='ebP1_'+id;
+  iP1.value=b.pay1Amt?b.pay1Amt.toFixed(2):'';iP1.placeholder='0.00';
+  iP1.onkeyup=function(){autoDecimal(this);ebCalcPay2(id);};
+  fP1.appendChild(lP1);fP1.appendChild(iP1);
+  var fP2=document.createElement('div');fP2.className='fld';
+  var lP2=document.createElement('label');lP2.className='flbl';lP2.textContent='Payment 2 — auto';
+  var iP2=document.createElement('input');iP2.className='finp';iP2.type='number';iP2.step='0.01';iP2.id='ebP2_'+id;
+  iP2.value=b.pay2Amt?b.pay2Amt.toFixed(2):'';iP2.placeholder='0.00';iP2.readOnly=true;iP2.style.opacity='0.6';
+  fP2.appendChild(lP2);fP2.appendChild(iP2);
+  r3.appendChild(fP1);r3.appendChild(fP2);wrap.appendChild(r3);
+
+  // Buttons
+  var btns=document.createElement('div');btns.className='ef-btns';
+  var bSave=document.createElement('button');bSave.className='btn btn-g btn-sm';bSave.textContent='Save';
+  bSave.onclick=function(){saveBillEdit(id);};
+  var bCancel=document.createElement('button');bCancel.className='btn btn-sm';
+  bCancel.style.cssText='background:none;color:var(--muted);border:1px solid var(--border);';bCancel.textContent='Cancel';
+  bCancel.onclick=function(){container.innerHTML='';};
+  btns.appendChild(bSave);btns.appendChild(bCancel);wrap.appendChild(btns);
+
+  container.appendChild(wrap);
 }
 
 function ebOnTypeChange(id){
@@ -638,10 +687,19 @@ function saveBillEdit(id) {
   var type=document.getElementById('ebT_'+id).value;
   if(!name||!amount){toast('Enter name and amount');return;}
   bills[idx].name=name;bills[idx].amount=amount;
-  var newPerPay=(type==='split'||type==='autowdsplit')?+(amount/2).toFixed(2):amount;
-  if(type==='manualsplit'){ newPerPay=bills[idx].pay1Amt||+(amount/2).toFixed(2); }
-  bills[idx].perPay=newPerPay;
   bills[idx].cat=cat;bills[idx].type=type;
+  if(type==='manualsplit'){
+    var p1=parseFloat(document.getElementById('ebP1_'+id).value)||0;
+    var p2=Math.max(0,+(amount-p1).toFixed(2));
+    if(!p1||p1<=0){toast('Enter Payment 1 amount');return;}
+    bills[idx].pay1Amt=p1;
+    bills[idx].pay2Amt=p2;
+    bills[idx].perPay=p1;
+  } else {
+    bills[idx].pay1Amt=null;
+    bills[idx].pay2Amt=null;
+    bills[idx].perPay=(type==='split'||type==='autowdsplit')?+(amount/2).toFixed(2):amount;
+  }
   save();renderBills();renderBudget();renderStats();
   toast('Bill updated!');
 }
