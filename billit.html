@@ -887,8 +887,21 @@ function renderSubs() {
     if(!subPay[pid][s.id])subPay[pid][s.id]={paid:false,date:''};
     var sp=subPay[pid][s.id];
     var cycleLbl=s.cycle==='yearly'?'Yearly':'Monthly';
-    var dueLbl=s.cycle==='yearly'&&s.month?'Due '+MONTHS[s.month]+(s.day?' '+s.day:'')+( s.year?' '+s.year:''):(s.day?'Bills on '+s.day+'th':'');
+    var dayOrd=s.day?(s.day+(s.day===1?'st':s.day===2?'nd':s.day===3?'rd':'th')):'';
+    var dueLbl=s.cycle==='yearly'&&s.month?'Due '+MONTHS[s.month]+(s.day?' '+s.day:'')+( s.year?' '+s.year:''):(dayOrd?dayOrd:'');
     var col=sp.paid?'var(--accent)':'var(--text)';
+    // Calculate save per check for unpaid yearly subs
+    var savePerCheck='';
+    if(s.cycle==='yearly'&&!sp.paid&&!s.paused&&!isSubSkippedThisMonth(s)){
+      var now2=new Date();
+      var dueDate=new Date(s.year||(now2.getFullYear()+(s.month<=now2.getMonth()?1:0)),
+        (s.month||1)-1,(s.day||1));
+      if(dueDate<=now2&&s.year){dueDate=new Date((s.year||now2.getFullYear())+1,(s.month||1)-1,(s.day||1));}
+      var msLeft=dueDate-now2;
+      var periodsLeft=Math.max(1,Math.ceil(msLeft/(14*24*3600*1000)));
+      var perCheck=+(s.amount/periodsLeft).toFixed(2);
+      savePerCheck='Save '+fm(perCheck)+'/check ('+periodsLeft+' periods left)';
+    }
 
     // Row wrapper
     var row=document.createElement('div');
@@ -904,8 +917,8 @@ function renderSubs() {
     var metaEl=document.createElement('div');metaEl.className='br-meta';
     var isSkipped2=isSubSkippedThisMonth(s);
     var statusTxt=s.paused?'Paused':isSkipped2?'Skipped this month':sp.paid?'&#10003; Paid':'Unpaid';
-    var statusCol=s.paused?'var(--accent3)':isSkipped2?'var(--accent4)':sp.paid?'var(--accent)':'var(--muted)';
-    metaEl.innerHTML=cycleLbl+(dueLbl?' &middot; '+dueLbl:'')+'&nbsp;|&nbsp;<span style="color:'+statusCol+'">'+statusTxt+'</span>';
+    var statusCol=s.paused?'var(--accent3)':isSkipped2?'var(--accent4)':sp.paid?'var(--accent)':'var(--accent2)';
+    metaEl.innerHTML=cycleLbl+(dueLbl?' &middot; '+dueLbl:'')+'&nbsp;|&nbsp;<span style="color:'+statusCol+'">'+statusTxt+'</span>'+(savePerCheck?'<br><span style="font-size:10px;color:var(--accent4)">'+savePerCheck+'</span>':'');
     left.appendChild(nameEl);left.appendChild(metaEl);
 
     var right=document.createElement('div');
@@ -918,7 +931,7 @@ function renderSubs() {
     else if(isSkipped){badge.classList.add('skipped');badge.textContent='Skipped';}
     else if(s.cycle!=='yearly'){badge.classList.add('monthly');badge.textContent='Monthly';}
     else if(s.month===curMonth){badge.classList.add('yearly-due');badge.textContent='Due This Month';}
-    else{badge.classList.add('yearly');badge.textContent='Yearly';}
+    else{badge.classList.add('yearly');badge.textContent='Not Due Yet';}
     var amtWrap=document.createElement('div');
     var amtEl=document.createElement('div');amtEl.className='br-amt';amtEl.style.color=col;amtEl.textContent=fm(s.amount);
     var cycleEl=document.createElement('div');cycleEl.className='br-cycle';cycleEl.textContent=s.cycle==='yearly'?'per year':'per month';
