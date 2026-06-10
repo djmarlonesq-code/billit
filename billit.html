@@ -860,7 +860,7 @@ function renderSubs() {
 
   // Summary line
   var curPid=nowPeriod();
-  var monthlySubs=subscriptions.filter(function(s){return s.cycle!=='yearly'&&!s.paused&&!((subPay[curPid]||{})[s.id]||{}).skipped;});
+  var monthlySubs=subscriptions.filter(function(s){return s.cycle!=='yearly'&&!s.paused&&!isSubSkippedThisMonth(s);});
   var yearlyDueThisMonth=subscriptions.filter(function(s){return s.cycle==='yearly'&&s.month===curMonth&&!s.paused;});
   var monthlyTotal=monthlySubs.reduce(function(t,s){return t+s.amount;},0)+yearlyDueThisMonth.reduce(function(t,s){return t+s.amount;},0);
   var summaryEl=document.createElement('div');
@@ -902,7 +902,7 @@ function renderSubs() {
     var left=document.createElement('div');
     var nameEl=document.createElement('div');nameEl.className='br-name';nameEl.textContent=s.name;
     var metaEl=document.createElement('div');metaEl.className='br-meta';
-    var isSkipped2=(sp&&sp.skipped)||false;
+    var isSkipped2=isSubSkippedThisMonth(s);
     var statusTxt=s.paused?'Paused':isSkipped2?'Skipped this period':sp.paid?'&#10003; Paid':'Unpaid';
     var statusCol=s.paused?'var(--accent3)':isSkipped2?'var(--accent4)':sp.paid?'var(--accent)':'var(--muted)';
     metaEl.innerHTML=cycleLbl+(dueLbl?' &middot; '+dueLbl:'')+'&nbsp;|&nbsp;<span style="color:'+statusCol+'">'+statusTxt+'</span>';
@@ -911,7 +911,7 @@ function renderSubs() {
     var right=document.createElement('div');
     right.className='br-right';
     // Badge
-    var isSkipped=(subPay[pid]&&subPay[pid][s.id]&&subPay[pid][s.id].skipped)||false;
+    var isSkipped=isSubSkippedThisMonth(s)||(s.skipMonth&&(function(){var now=new Date();return s.skipMonth===now.getMonth()+1&&s.skipYear===now.getFullYear();}()));
     var badge=document.createElement('span');
     badge.className='sub-badge';
     if(s.paused){badge.classList.add('paused');badge.textContent='Paused';}
@@ -958,7 +958,8 @@ function renderSubs() {
     var editBtn=document.createElement('button');editBtn.className='btn btn-b btn-sm';editBtn.textContent='Edit';
     var delBtn=document.createElement('button');delBtn.className='btn btn-r btn-sm';delBtn.textContent='Remove';
     var pauseBtn=document.createElement('button');pauseBtn.className='lnk-btn';pauseBtn.style.color=s.paused?'var(--accent)':'var(--accent3)';pauseBtn.textContent=s.paused?'Resume':'Pause';
-    var skipBtn=document.createElement('button');skipBtn.className='lnk-btn';skipBtn.style.color=((subPay[pid]||{})[s.id]||{}).skipped?'var(--accent)':'var(--accent4)';skipBtn.textContent=((subPay[pid]||{})[s.id]||{}).skipped?'Unskip':'Skip Period';
+    var isSkippedNow=isSubSkippedThisMonth(s);
+    var skipBtn=document.createElement('button');skipBtn.className='lnk-btn';skipBtn.style.color=isSkippedNow?'var(--accent)':'var(--accent4)';skipBtn.textContent=isSkippedNow?'Unskip':'Skip Month';
     if(s.paused){skipBtn.style.opacity='0.4';skipBtn.style.pointerEvents='none';}
     actDiv.appendChild(editBtn);actDiv.appendChild(pauseBtn);actDiv.appendChild(skipBtn);actDiv.appendChild(delBtn);
     body.appendChild(actDiv);
@@ -1096,14 +1097,41 @@ function toggleSubPause(subId){
   toast(subscriptions[idx].paused?'Subscription paused':'Subscription resumed');
 }
 
+function isSubSkippedThisMonth(sub){
+  if(!sub.skipMonth)return false;
+  var now=new Date();
+  return sub.skipMonth===now.getMonth()+1&&sub.skipYear===now.getFullYear();
+}
+
 function toggleSubSkip(pid,subId){
-  if(!subPay[pid])subPay[pid]={};
-  if(!subPay[pid][subId])subPay[pid][subId]={paid:false,date:'',skipped:false};
-  subPay[pid][subId].skipped=!subPay[pid][subId].skipped;
-  // If skipping, unmark paid
-  if(subPay[pid][subId].skipped){subPay[pid][subId].paid=false;subPay[pid][subId].date='';}
+  var idx=subscriptions.findIndex(function(s){return s.id===subId;});
+  if(idx<0)return;
+  var sub=subscriptions[idx];
+  var now=new Date();
+  var curMo=now.getMonth()+1, curYr=now.getFullYear();
+  // If already paid this period, skip takes effect next month
+  var sp=(subPay[pid]||{})[subId]||{};
+  if(sp.paid){
+    // Apply skip to next month
+    var nextMo=curMo===12?1:curMo+1;
+    var nextYr=curMo===12?curYr+1:curYr;
+    if(sub.skipMonth===nextMo&&sub.skipYear===nextYr){
+      sub.skipMonth=null;sub.skipYear=null;
+      toast('Skip removed for next month');
+    } else {
+      sub.skipMonth=nextMo;sub.skipYear=nextYr;
+      toast('Will skip next month (already paid this month)');
+    }
+  } else {
+    if(isSubSkippedThisMonth(sub)){
+      sub.skipMonth=null;sub.skipYear=null;
+      toast('Unskipped');
+    } else {
+      sub.skipMonth=curMo;sub.skipYear=curYr;
+      toast('Skipped for this month');
+    }
+  }
   save();renderSubs();renderBudget();renderStats();
-  toast(subPay[pid][subId].skipped?'Skipped this period':'Unskipped');
 }
 
 function toggleSubPay(pid,subId){
@@ -1452,6 +1480,16 @@ function exportStatsPdf(){
     if(paid>0) billRows+='<tr><td>'+b.name+'</td><td>'+b.cat+'</td><td style="text-align:right;color:#00a86b">'+fm(paid)+'</td></tr>';
   });
 
+  // Build sub details including paused/skipped notes
+  var subRows='';
+  subscriptions.forEach(function(s){
+    var paidAmt=0;
+    pids.forEach(function(pid){var sp=(subPay[pid]||{})[s.id]||{};if(sp.paid)paidAmt+=s.amount;});
+    var note=s.paused?'[PAUSED]':isSubSkippedThisMonth(s)?'[SKIPPED THIS MONTH]':'';
+    var amtColor=s.paused||isSubSkippedThisMonth(s)?'#999':(paidAmt>0?'#00a86b':'#1a1a2e');
+    subRows+='<tr><td>'+s.name+'</td><td>'+(s.cycle==='yearly'?'Yearly':'Monthly')+'</td><td style="color:#888">'+note+'</td><td style="text-align:right;color:'+amtColor+'">'+fm(paidAmt)+'</td></tr>';
+  });
+
   // Build expense details
   var expRows='';
   pids.forEach(function(pid){
@@ -1502,6 +1540,7 @@ function exportStatsPdf(){
     '<h2>Spending by Category</h2>'+
     '<table><tr><th>Category</th><th style="text-align:right">%</th><th style="text-align:right">Amount</th></tr>'+catRows+'</table>'+
     (billRows?'<h2>Bill Payments</h2><table><tr><th>Bill</th><th>Category</th><th style="text-align:right">Paid</th></tr>'+billRows+'</table>':'')+
+    (subRows?'<h2>Subscriptions</h2><table><tr><th>Name</th><th>Cycle</th><th>Status</th><th style="text-align:right">Paid</th></tr>'+subRows+'</table>':'')+
     (expRows?'<h2>Daily Entries</h2><table><tr><th>Date</th><th>Description</th><th>Category</th><th style="text-align:right">Amount</th></tr>'+expRows+'</table>':'')+
     '</body></html>';
 
