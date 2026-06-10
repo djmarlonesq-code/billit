@@ -1419,16 +1419,16 @@ function exportStatsPdf(){
   var billRows='';
   bills.forEach(function(b){
     var paid=pids.reduce(function(t,pid){return t+getPaidAmt(pid,b);},0);
-    if(paid>0) billRows+='<tr><td>'+b.name+'</td><td>'+b.cat+'</td><td style="text-align:right;" class="c-bill">'+fm(paid)+'</td></tr>';
+    if(paid>0) billRows+='<tr><td>'+b.name+'</td><td>'+b.cat+'</td><td style="text-align:right;color:#00a86b">'+fm(paid)+'</td></tr>';
   });
 
   // Build expense details
   var expRows='';
   pids.forEach(function(pid){
     getExpensesForPeriod(pid).forEach(function(e){
-      var expClass=e.type==='deposit'?'c-deposit':'c-expense';
+      var expColor=e.type==='deposit'?'#00a86b':'#e53935';
       var prefix=e.type==='deposit'?'+ ':'';
-      expRows+='<tr><td>'+e.date+'</td><td>'+e.name+(e.merchant?' ('+e.merchant+')':'')+'</td><td>'+e.cat+'</td><td style="text-align:right;" class="'+expClass+'">'+prefix+fm(e.amount)+'</td></tr>';
+      expRows+='<tr><td>'+e.date+'</td><td>'+e.name+(e.merchant?' ('+e.merchant+')':'')+'</td><td>'+e.cat+'</td><td style="text-align:right;color:'+expColor+'">'+prefix+fm(e.amount)+'</td></tr>';
     });
   });
 
@@ -1465,9 +1465,9 @@ function exportStatsPdf(){
     '<h1>Billit — '+title+'</h1>'+
     '<p>Generated '+new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})+'</p>'+
     '<div class="summary">'+
-      '<div class="scard"><div class="scard-val c-budget">'+fm(totalBudget)+'</div><div class="scard-lbl">Total Budget</div></div>'+
-      '<div class="scard"><div class="scard-val c-paid">'+fm(paid2)+'</div><div class="scard-lbl">Paid Out</div></div>'+
-      '<div class="scard"><div class="scard-val '+(totalBudget-paid2>=0?'c-remain-pos':'c-remain-neg')+'">'+fm(Math.max(0,totalBudget-paid2))+'</div><div class="scard-lbl">Remaining</div></div>'+
+      '<div class="scard"><div class="scard-val" style="color:#1a1a2e">'+fm(totalBudget)+'</div><div class="scard-lbl">Total Budget</div></div>'+
+      '<div class="scard"><div class="scard-val" style="color:#e53935">'+fm(paid2)+'</div><div class="scard-lbl">Paid Out</div></div>'+
+      '<div class="scard"><div class="scard-val" style="color:'+(totalBudget-paid2>=0?'#00a86b':'#e53935')+'">'+fm(Math.max(0,totalBudget-paid2))+'</div><div class="scard-lbl">Remaining</div></div>'+
     '</div>'+
     '<h2>Spending by Category</h2>'+
     '<table><tr><th>Category</th><th style="text-align:right">%</th><th style="text-align:right">Amount</th></tr>'+catRows+'</table>'+
