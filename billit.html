@@ -310,7 +310,15 @@ canvas{display:block;width:100%;}
         <div class="fld"><label class="flbl">Amount ($)</label><input class="finp" id="nEAmt" type="number" step="0.01" placeholder="0.00" onkeyup="autoDecimal(this)"></div>
         <div class="fld"><label class="flbl">Category</label><select class="fsel" id="nECat"></select></div>
       </div>
-      <button class="btn btn-g" id="addExpBtn">+ Log Expense</button>
+      <div class="frow">
+        <div class="fld"><label class="flbl">Entry Type</label>
+          <select class="fsel" id="nEType">
+            <option value="expense">Expense</option>
+            <option value="deposit">Deposit</option>
+          </select>
+        </div>
+      </div>
+      <button class="btn btn-g" id="addExpBtn">+ Log Entry</button>
     </div>
   </div>
   <div id="expList"></div>
@@ -561,7 +569,10 @@ function getTotalPaid(pid) {
   var t=0;
   bills.forEach(function(b){t+=getPaidAmt(pid,b);});
   subscriptions.forEach(function(s){var sp=(subPay[pid]||{})[s.id]||{};if(sp.paid)t+=s.amount;});
-  getExpensesForPeriod(pid).forEach(function(e){t+=e.amount;});
+  getExpensesForPeriod(pid).forEach(function(e){
+    if(e.type==='deposit') t-=e.amount;
+    else t+=e.amount;
+  });
   return t;
 }
 
@@ -600,14 +611,21 @@ function renderBills() {
   bills.forEach(function(b) {
     var pid=curPeriod; ensureBP(pid,b.id); var p=billPay[pid][b.id];
     var isSplit=b.type==='split'||b.type==='autowdsplit'||b.type==='manualsplit', isAuto=b.type==='auto'||b.type==='autowdsplit', isAutoSplit=b.type==='autowdsplit', isManualSplit=b.type==='manualsplit';
-    var ta=isManualSplit?(b.pay1Amt||0)+(b.pay2Amt||0):isSplit?b.perPay*2:b.perPay, pa=getPaidAmt(pid,b), pct=ta>0?Math.min(pa/ta*100,100):0;
-    var isDone=isSplit?(p.p1&&p.p2):p.p1, col=catColor(b.cat);
+
+    var ta=isManualSplit?(b.pay1Amt||0)+(b.pay2Amt||0):isSplit?b.perPay*2:b.perPay;
+    var pa=getPaidAmt(pid,b);
+    var pct=ta>0?Math.min(pa/ta*100,100):0;
+
+    var isDone=isSplit?(p.p1&&p.p2):p.p1;
+
     var statusTxt, statusCol;
     if(isDone){statusTxt='&#10003; Paid';statusCol='var(--accent)';}
     else if(isSplit&&p.p1&&!p.p2){statusTxt='1 of 2'+(p.p1d?' &middot; '+p.p1d:'');statusCol='var(--accent3)';}
     else{statusTxt='Unpaid';statusCol='var(--muted)';}
     var cycleLbl=b.type==='autowdsplit'?' &middot; Auto WD Split':b.type==='manualsplit'?' &middot; Manual Split':b.type==='auto'?' &middot; Auto WD':b.type==='split'?' &middot; Split':' &middot; Manual';
     var perLbl='per month';
+    var col=isDone?'var(--accent)':pa>0?'var(--accent3)':'var(--text)';
+
     var bodyId='bb_'+b.id+'_'+pid, chevId='bc_'+b.id+'_'+pid;
     var row=document.createElement('div');
     row.className='bill-row'+(isDone?' done':'')+(isAuto?' auto':'');
@@ -846,7 +864,7 @@ function renderSubs() {
     var sp=subPay[pid][s.id];
     var cycleLbl=s.cycle==='yearly'?'Yearly':'Monthly';
     var dueLbl=s.cycle==='yearly'&&s.month?'Due '+MONTHS[s.month]+(s.day?' '+s.day:'')+( s.year?' '+s.year:''):(s.day?'Bills on '+s.day+'th':'');
-    var col=catColor('Subscriptions');
+    var col=sp.paid?'var(--accent)':'var(--text)';
 
     // Row wrapper
     var row=document.createElement('div');
@@ -1055,10 +1073,17 @@ function renderExpenses() {
 
   if(!exps.length){list.innerHTML='<div class="empty">No expenses logged yet.<br>Tap Log Expense above.</div>';return;}
 
-  var total=exps.reduce(function(s,e){return s+e.amount;},0);
+  var total=exps.reduce(function(s,e){return e.type==='deposit'?s-e.amount:s+e.amount;},0);
   var hdr=document.createElement('div');
   hdr.style.cssText='font-size:11px;color:var(--muted);margin-bottom:10px;';
-  hdr.textContent=exps.length+' expense'+(exps.length!==1?'s':'')+' - '+fm(total)+' total';
+  var deposits=exps.filter(function(e){return e.type==='deposit';});
+  var expCount=exps.length-deposits.length;
+  var depCount=deposits.length;
+  var hdrParts=[];
+  if(expCount>0)hdrParts.push(expCount+' expense'+(expCount!==1?'s':''));
+  if(depCount>0)hdrParts.push(depCount+' deposit'+(depCount!==1?'s':''));
+  hdr.innerHTML=hdrParts.join(' &middot; ')+' &nbsp;|&nbsp; Net: <span style="color:'+(total<0?'var(--accent)':'var(--accent2)')+'">'+
+    (total<0?'+':'')+fm(Math.abs(total))+'</span>';
   list.appendChild(hdr);
 
   // Sort: primary by date newest first, secondary by last entered first
@@ -1088,7 +1113,10 @@ function renderExpenses() {
 
     var rightDiv=document.createElement('div');
     rightDiv.style.cssText='text-align:right;flex-shrink:0;display:flex;align-items:center;gap:8px;';
-    var amtEl=document.createElement('div');amtEl.className='exp-amt';amtEl.textContent=fm(e.amount);
+    var isDeposit=e.type==='deposit';
+    var amtEl=document.createElement('div');amtEl.className='exp-amt';
+    amtEl.style.color=isDeposit?'var(--accent)':'var(--accent2)';
+    amtEl.textContent=(isDeposit?'+ ':'')+fm(e.amount);
     var chevEl=document.createElement('span');chevEl.id='eChev_'+e.id;
     chevEl.style.cssText='color:var(--muted);font-size:12px;';chevEl.textContent='▾';
     rightDiv.appendChild(amtEl);rightDiv.appendChild(chevEl);
@@ -1213,7 +1241,9 @@ function renderStats(){
   categories.forEach(function(c){catTotals[c]=0;});
   bills.forEach(function(b){catTotals[b.cat]=(catTotals[b.cat]||0)+getPaidAmt(pid,b);});
   subscriptions.forEach(function(s){var sp=(subPay[pid]||{})[s.id]||{};if(sp.paid)catTotals['Subscriptions']=(catTotals['Subscriptions']||0)+s.amount;});
-  getExpensesForPeriod(pid).forEach(function(e){catTotals[e.cat]=(catTotals[e.cat]||0)+e.amount;});
+  getExpensesForPeriod(pid).forEach(function(e){
+    if(e.type!=='deposit') catTotals[e.cat]=(catTotals[e.cat]||0)+e.amount;
+  });
   var total=Object.keys(catTotals).reduce(function(s,k){return s+catTotals[k];},0);
   var active=Object.keys(catTotals).filter(function(c){return catTotals[c]>0.005;}).sort(function(a,b){return catTotals[b]-catTotals[a];});
   var canvas=document.getElementById('donut'),ctx=canvas.getContext('2d');
@@ -1403,7 +1433,9 @@ document.getElementById('addExpBtn').addEventListener('click',function(){
   var cat=document.getElementById('nECat').value;
   if(!name||!amount){toast('Enter description and amount');return;}
   var now=new Date();
-  expenses.push({id:uid(),name:name,merchant:merchant,amount:amount,cat:cat,date:fmtShort(now),dateISO:fmtISO(now)});
+  var etype=document.getElementById('nEType').value;
+  expenses.push({id:uid(),name:name,merchant:merchant,amount:amount,cat:cat,date:fmtShort(now),dateISO:fmtISO(now),type:etype});
+  document.getElementById('nEType').value='expense';
   document.getElementById('nEName').value='';document.getElementById('nEMerchant').value='';document.getElementById('nEAmt').value='';
   document.getElementById('addExpBd').classList.remove('open');document.getElementById('addExpHnt').textContent='tap to add';
   save();renderExpenses();renderBudget();renderStats();toast('Expense logged!');
