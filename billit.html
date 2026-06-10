@@ -171,12 +171,15 @@ canvas{display:block;width:100%;}
 .sub-badge.yearly-due{background:rgba(0,229,160,0.15);color:var(--accent);border:1px solid rgba(0,229,160,0.3);}
 .sub-badge.yearly{background:rgba(107,107,138,0.15);color:var(--muted);border:1px solid rgba(107,107,138,0.3);}
 
+.stats-filter-btn{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:7px 14px;font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);cursor:pointer;transition:all 0.2s;}
+.stats-filter-btn.active{background:rgba(0,229,160,0.12);border-color:rgba(0,229,160,0.4);color:var(--accent);}
+
 .toast{position:fixed;bottom:calc(68px + var(--safe-bottom));left:50%;transform:translateX(-50%) translateY(20px);background:var(--accent);color:#000;padding:10px 20px;border-radius:99px;font-size:13px;font-weight:700;opacity:0;transition:all 0.3s;z-index:999;white-space:nowrap;pointer-events:none;}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
 </style>
 </head>
 <body>
-<button class="mask-btn on" id="maskBtn">Hide amounts</button>
+<button class="mask-btn on" id="maskBtn" style="display:none;">Hide amounts</button>
 <div id="app">
 <div id="content">
 
@@ -329,17 +332,35 @@ canvas{display:block;width:100%;}
   <div class="page-tag">Billit</div>
   <div class="page-title">Stats &amp; Data</div>
   <div class="page-sub" id="statsSub">Spending breakdown</div>
+
+  <!-- Stats filter bar -->
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:14px;">
+    <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
+      <button class="stats-filter-btn active" id="sfCurrent" onclick="setStatsFilter('current')">This Period</button>
+      <button class="stats-filter-btn" id="sfOverall" onclick="setStatsFilter('overall')">Overall</button>
+      <button class="stats-filter-btn" id="sfCustom" onclick="setStatsFilter('custom')">Custom</button>
+    </div>
+    <div id="statsCustomRange" style="display:none;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px;">
+        <div class="fld"><label class="flbl">From Period</label><input class="finp" id="sfFrom" type="number" min="1" value="1" placeholder="1" onchange="renderStats()"></div>
+        <div class="fld"><label class="flbl">To Period</label><input class="finp" id="sfTo" type="number" min="1" value="1" placeholder="1" onchange="renderStats()"></div>
+      </div>
+      <div style="font-size:10px;color:var(--muted);font-family:'DM Mono',monospace;margin-top:4px;" id="sfRangeLabel"></div>
+    </div>
+  </div>
+
   <div class="chart-card"><div class="c-lbl">Spending by Category</div><canvas id="donut" height="200"></canvas></div>
   <div class="chart-card"><div class="c-lbl">Category Breakdown</div><div id="catBreak"></div></div>
   <div class="chart-card"><div class="c-lbl">Budget Flow</div><div id="flowBox"></div></div>
+  <button class="btn" style="background:var(--accent4);color:#fff;margin-top:4px;" id="exportPdfBtn" onclick="exportStatsPdf()">&#128196; Export to PDF</button>
 </div>
 
 </div><!-- content -->
 <nav id="nav">
-  <button class="nav-btn active" data-page="budget"><span class="nav-icon">&#9776;</span><span class="nav-lbl">Budget</span></button>
-  <button class="nav-btn" data-page="bills"><span class="nav-icon">&#128196;</span><span class="nav-lbl">Pay Bills</span></button>
-  <button class="nav-btn" data-page="subs"><span class="nav-icon">&#9654;</span><span class="nav-lbl">Streams</span></button>
-  <button class="nav-btn" data-page="expenses"><span class="nav-icon">&#128176;</span><span class="nav-lbl">Daily</span></button>
+  <button class="nav-btn active" data-page="budget"><span class="nav-icon">&#128176;</span><span class="nav-lbl">Budget</span></button>
+  <button class="nav-btn" data-page="bills"><span class="nav-icon">&#128197;</span><span class="nav-lbl">Pay Bills</span></button>
+  <button class="nav-btn" data-page="subs"><span class="nav-icon" style="display:flex;align-items:center;justify-content:center;"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="20" height="20" rx="4" fill="white"/><polygon points="7,5 16,10 7,15" fill="#ff3b30"/></svg></span><span class="nav-lbl">Streams</span></button>
+  <button class="nav-btn" data-page="expenses"><span class="nav-icon">&#128179;</span><span class="nav-lbl">Daily</span></button>
   <button class="nav-btn" data-page="stats"><span class="nav-icon">&#128202;</span><span class="nav-lbl">Stats</span></button>
 </nav>
 </div><!-- app -->
@@ -1234,15 +1255,47 @@ function deleteExp(id){
   toast('Removed');
 }
 
+var statsFilter='current';
+
+function setStatsFilter(f){
+  statsFilter=f;
+  document.querySelectorAll('.stats-filter-btn').forEach(function(b){b.classList.remove('active');});
+  document.getElementById('sf'+f.charAt(0).toUpperCase()+f.slice(1)).classList.add('active');
+  var cr=document.getElementById('statsCustomRange');
+  if(cr)cr.style.display=f==='custom'?'block':'none';
+  renderStats();
+}
+
+function getStatsPeriods(){
+  var cur=nowPeriod();
+  if(statsFilter==='overall'){
+    var pids=[];for(var i=0;i<=cur;i++)pids.push(i);return pids;
+  }
+  if(statsFilter==='custom'){
+    var from=parseInt(document.getElementById('sfFrom').value)||1;
+    var to=parseInt(document.getElementById('sfTo').value)||1;
+    from=Math.max(1,from);to=Math.max(from,to);
+    var pids=[];for(var i=from-1;i<=to-1&&i<=cur;i++)pids.push(i);
+    var lbl=document.getElementById('sfRangeLabel');
+    if(lbl)lbl.textContent=fmtPeriod(from-1)+(from!==to?' to '+fmtPeriod(to-1):'');
+    return pids;
+  }
+  return [cur];
+}
+
 function renderStats(){
-  var pid=nowPeriod();
-  document.getElementById('statsSub').textContent=fmtPeriod(pid)+' - Period '+(pid+1);
+  var pids=getStatsPeriods();
+  var cur=nowPeriod();
+  var subLbl=statsFilter==='overall'?'All '+cur+' periods':statsFilter==='custom'?'Custom range':fmtPeriod(cur)+' - Period '+(cur+1);
+  document.getElementById('statsSub').textContent=subLbl;
   var catTotals={};
   categories.forEach(function(c){catTotals[c]=0;});
-  bills.forEach(function(b){catTotals[b.cat]=(catTotals[b.cat]||0)+getPaidAmt(pid,b);});
-  subscriptions.forEach(function(s){var sp=(subPay[pid]||{})[s.id]||{};if(sp.paid)catTotals['Subscriptions']=(catTotals['Subscriptions']||0)+s.amount;});
-  getExpensesForPeriod(pid).forEach(function(e){
-    if(e.type!=='deposit') catTotals[e.cat]=(catTotals[e.cat]||0)+e.amount;
+  pids.forEach(function(pid){
+    bills.forEach(function(b){catTotals[b.cat]=(catTotals[b.cat]||0)+getPaidAmt(pid,b);});
+    subscriptions.forEach(function(s){var sp=(subPay[pid]||{})[s.id]||{};if(sp.paid)catTotals['Subscriptions']=(catTotals['Subscriptions']||0)+s.amount;});
+    getExpensesForPeriod(pid).forEach(function(e){
+      if(e.type!=='deposit') catTotals[e.cat]=(catTotals[e.cat]||0)+e.amount;
+    });
   });
   var total=Object.keys(catTotals).reduce(function(s,k){return s+catTotals[k];},0);
   var active=Object.keys(catTotals).filter(function(c){return catTotals[c]>0.005;}).sort(function(a,b){return catTotals[b]-catTotals[a];});
@@ -1290,9 +1343,11 @@ function renderStats(){
     var pct=total>0?(catTotals[cat]/total*100):0;
     bd.innerHTML+='<div class="cat-row"><div class="cat-dot" style="background:'+catColor(cat)+'"></div><div class="cat-name">'+cat+'</div><div class="cat-bar-bg"><div class="cat-bar-fill" style="width:'+pct.toFixed(1)+'%;background:'+catColor(cat)+'"></div></div><div class="cat-amt">'+fm(catTotals[cat])+'</div></div>';
   });
-  var paid2=getTotalPaid(pid),rem2=Math.max(0,BUDGET-paid2);
+  var totalBudget=BUDGET*pids.length;
+  var paid2=pids.reduce(function(t,pid){return t+getTotalPaid(pid);},0);
+  var rem2=Math.max(0,totalBudget-paid2);
   document.getElementById('flowBox').innerHTML=
-    '<div class="flow-row"><span style="color:var(--accent)">Starting Budget</span><span>'+fm(BUDGET)+'</span></div>'+
+    '<div class="flow-row"><span style="color:var(--accent)">Total Budget</span><span>'+fm(totalBudget)+'</span></div>'+
     '<div class="flow-row"><span style="color:var(--accent2)">Total Paid Out</span><span>'+fm(paid2)+'</span></div>'+
     '<div class="flow-div"></div>'+
     '<div class="flow-row"><span style="color:var(--accent3);font-weight:700;">Remaining</span><span style="color:var(--accent3);font-weight:700;">'+fm(rem2)+'</span></div>';
@@ -1344,6 +1399,81 @@ function updateCatSelects(){
   ['nBCat','nECat'].forEach(function(id){var el=document.getElementById(id);if(el)el.innerHTML=opts;});
 }
 
+function exportStatsPdf(){
+  var pids=getStatsPeriods();
+  var cur=nowPeriod();
+  var title='Billit Stats - '+(statsFilter==='overall'?'All Periods':statsFilter==='custom'?'Custom Range':fmtPeriod(cur));
+
+  // Build category totals
+  var catTotals={};
+  categories.forEach(function(c){catTotals[c]=0;});
+  pids.forEach(function(pid){
+    bills.forEach(function(b){catTotals[b.cat]=(catTotals[b.cat]||0)+getPaidAmt(pid,b);});
+    subscriptions.forEach(function(s){var sp=(subPay[pid]||{})[s.id]||{};if(sp.paid)catTotals['Subscriptions']=(catTotals['Subscriptions']||0)+s.amount;});
+    getExpensesForPeriod(pid).forEach(function(e){if(e.type!=='deposit')catTotals[e.cat]=(catTotals[e.cat]||0)+e.amount;});
+  });
+  var total=Object.keys(catTotals).reduce(function(s,k){return s+catTotals[k];},0);
+  var active=Object.keys(catTotals).filter(function(c){return catTotals[c]>0;}).sort(function(a,b){return catTotals[b]-catTotals[a];});
+
+  // Build bill details
+  var billRows='';
+  bills.forEach(function(b){
+    var paid=pids.reduce(function(t,pid){return t+getPaidAmt(pid,b);},0);
+    if(paid>0) billRows+='<tr><td>'+b.name+'</td><td>'+b.cat+'</td><td style="text-align:right;color:#00e5a0">'+fm(paid)+'</td></tr>';
+  });
+
+  // Build expense details
+  var expRows='';
+  pids.forEach(function(pid){
+    getExpensesForPeriod(pid).forEach(function(e){
+      var color=e.type==='deposit'?'#00e5a0':'#ff6b6b';
+      var prefix=e.type==='deposit'?'+ ':'';
+      expRows+='<tr><td>'+e.date+'</td><td>'+e.name+(e.merchant?' ('+e.merchant+')':'')+'</td><td>'+e.cat+'</td><td style="text-align:right;color:'+color+'">'+prefix+fm(e.amount)+'</td></tr>';
+    });
+  });
+
+  var catRows=active.map(function(c){
+    var pct=total>0?(catTotals[c]/total*100).toFixed(1):0;
+    return '<tr><td>'+c+'</td><td style="text-align:right">'+pct+'%</td><td style="text-align:right;color:#00e5a0">'+fm(catTotals[c])+'</td></tr>';
+  }).join('');
+
+  var totalBudget=BUDGET*pids.length;
+  var paid2=pids.reduce(function(t,pid){return t+getTotalPaid(pid);},0);
+
+  var html='<!DOCTYPE html><html><head><meta charset="UTF-8">'+
+    '<title>'+title+'</title>'+
+    '<style>'+
+      'body{font-family:Arial,sans-serif;color:#1a1a2e;padding:24px;font-size:12px;}'+
+      'h1{font-size:22px;margin-bottom:4px;color:#0a0a1a;}'+
+      'h2{font-size:14px;margin:20px 0 8px;color:#333;border-bottom:2px solid #00e5a0;padding-bottom:4px;}'+
+      'p{color:#666;font-size:11px;margin-bottom:16px;}'+
+      'table{width:100%;border-collapse:collapse;margin-bottom:16px;}'+
+      'th{background:#f0f0f0;padding:6px 8px;text-align:left;font-size:11px;font-weight:600;}'+
+      'td{padding:5px 8px;border-bottom:1px solid #eee;font-size:11px;}'+
+      '.summary{display:flex;gap:16px;margin-bottom:16px;}'+
+      '.scard{background:#f8f8f8;border-radius:8px;padding:10px 14px;flex:1;text-align:center;}'+
+      '.scard-val{font-size:16px;font-weight:700;color:#00e5a0;}'+
+      '.scard-lbl{font-size:10px;color:#888;margin-top:2px;}'+
+    '</style></head><body>'+
+    '<h1>Billit — '+title+'</h1>'+
+    '<p>Generated '+new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})+'</p>'+
+    '<div class="summary">'+
+      '<div class="scard"><div class="scard-val">'+fm(totalBudget)+'</div><div class="scard-lbl">Total Budget</div></div>'+
+      '<div class="scard"><div class="scard-val">'+fm(paid2)+'</div><div class="scard-lbl">Paid Out</div></div>'+
+      '<div class="scard"><div class="scard-val">'+fm(Math.max(0,totalBudget-paid2))+'</div><div class="scard-lbl">Remaining</div></div>'+
+    '</div>'+
+    '<h2>Spending by Category</h2>'+
+    '<table><tr><th>Category</th><th style="text-align:right">%</th><th style="text-align:right">Amount</th></tr>'+catRows+'</table>'+
+    (billRows?'<h2>Bill Payments</h2><table><tr><th>Bill</th><th>Category</th><th style="text-align:right">Paid</th></tr>'+billRows+'</table>':'')+
+    (expRows?'<h2>Daily Entries</h2><table><tr><th>Date</th><th>Description</th><th>Category</th><th style="text-align:right">Amount</th></tr>'+expRows+'</table>':'')+
+    '</body></html>';
+
+  var win=window.open('','_blank');
+  win.document.write(html);
+  win.document.close();
+  setTimeout(function(){win.print();},500);
+}
+
 function fullRender(){
   curPeriod=nowPeriod();
   expCurPeriod=nowPeriod();
@@ -1358,6 +1488,9 @@ document.querySelectorAll('.nav-btn').forEach(function(btn){
     btn.classList.add('active');
     document.getElementById('page-'+btn.dataset.page).classList.add('active');
     document.getElementById('content').scrollTop=0;
+    // Show mask button only on budget tab
+    var maskBtn=document.getElementById('maskBtn');
+    if(maskBtn) maskBtn.style.display=btn.dataset.page==='budget'?'block':'none';
     // Re-render stats when tab opens so canvas has correct width
     if(btn.dataset.page==='stats') setTimeout(renderStats, 50);
   });
@@ -1467,6 +1600,9 @@ document.getElementById('eNext').addEventListener('click',function(){expCurPerio
 
 load();
 fullRender();
+// Show mask button on initial load (budget tab is default)
+var _mb=document.getElementById('maskBtn');
+if(_mb)_mb.style.display='block';
 </script>
 </body>
 </html>
