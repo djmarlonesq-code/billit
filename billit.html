@@ -903,7 +903,7 @@ function renderSubs() {
     var nameEl=document.createElement('div');nameEl.className='br-name';nameEl.textContent=s.name;
     var metaEl=document.createElement('div');metaEl.className='br-meta';
     var isSkipped2=isSubSkippedThisMonth(s);
-    var statusTxt=s.paused?'Paused':isSkipped2?'Skipped this period':sp.paid?'&#10003; Paid':'Unpaid';
+    var statusTxt=s.paused?'Paused':isSkipped2?'Skipped this month':sp.paid?'&#10003; Paid':'Unpaid';
     var statusCol=s.paused?'var(--accent3)':isSkipped2?'var(--accent4)':sp.paid?'var(--accent)':'var(--muted)';
     metaEl.innerHTML=cycleLbl+(dueLbl?' &middot; '+dueLbl:'')+'&nbsp;|&nbsp;<span style="color:'+statusCol+'">'+statusTxt+'</span>';
     left.appendChild(nameEl);left.appendChild(metaEl);
