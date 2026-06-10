@@ -170,6 +170,8 @@ canvas{display:block;width:100%;}
 .sub-badge.monthly{background:rgba(0,229,160,0.15);color:var(--accent);border:1px solid rgba(0,229,160,0.3);}
 .sub-badge.yearly-due{background:rgba(0,229,160,0.15);color:var(--accent);border:1px solid rgba(0,229,160,0.3);}
 .sub-badge.yearly{background:rgba(107,107,138,0.15);color:var(--muted);border:1px solid rgba(107,107,138,0.3);}
+.sub-badge.paused{background:rgba(255,209,102,0.15);color:var(--accent3);border:1px solid rgba(255,209,102,0.3);}
+.sub-badge.skipped{background:rgba(123,140,255,0.15);color:var(--accent4);border:1px solid rgba(123,140,255,0.3);}
 
 .stats-filter-btn{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:7px 14px;font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);cursor:pointer;transition:all 0.2s;}
 .stats-filter-btn.active{background:rgba(0,229,160,0.12);border-color:rgba(0,229,160,0.4);color:var(--accent);}
@@ -857,8 +859,9 @@ function renderSubs() {
   var curMonth=now.getMonth()+1;
 
   // Summary line
-  var monthlySubs=subscriptions.filter(function(s){return s.cycle!=='yearly';});
-  var yearlyDueThisMonth=subscriptions.filter(function(s){return s.cycle==='yearly'&&s.month===curMonth;});
+  var curPid=nowPeriod();
+  var monthlySubs=subscriptions.filter(function(s){return s.cycle!=='yearly'&&!s.paused&&!((subPay[curPid]||{})[s.id]||{}).skipped;});
+  var yearlyDueThisMonth=subscriptions.filter(function(s){return s.cycle==='yearly'&&s.month===curMonth&&!s.paused;});
   var monthlyTotal=monthlySubs.reduce(function(t,s){return t+s.amount;},0)+yearlyDueThisMonth.reduce(function(t,s){return t+s.amount;},0);
   var summaryEl=document.createElement('div');
   summaryEl.style.cssText='font-size:11px;color:var(--muted);margin-bottom:12px;padding:0 2px;';
@@ -899,17 +902,21 @@ function renderSubs() {
     var left=document.createElement('div');
     var nameEl=document.createElement('div');nameEl.className='br-name';nameEl.textContent=s.name;
     var metaEl=document.createElement('div');metaEl.className='br-meta';
-    var statusTxt=sp.paid?'&#10003; Paid':'Unpaid';
-    var statusCol=sp.paid?'var(--accent)':'var(--muted)';
+    var isSkipped2=(sp&&sp.skipped)||false;
+    var statusTxt=s.paused?'Paused':isSkipped2?'Skipped this period':sp.paid?'&#10003; Paid':'Unpaid';
+    var statusCol=s.paused?'var(--accent3)':isSkipped2?'var(--accent4)':sp.paid?'var(--accent)':'var(--muted)';
     metaEl.innerHTML=cycleLbl+(dueLbl?' &middot; '+dueLbl:'')+'&nbsp;|&nbsp;<span style="color:'+statusCol+'">'+statusTxt+'</span>';
     left.appendChild(nameEl);left.appendChild(metaEl);
 
     var right=document.createElement('div');
     right.className='br-right';
     // Badge
+    var isSkipped=(subPay[pid]&&subPay[pid][s.id]&&subPay[pid][s.id].skipped)||false;
     var badge=document.createElement('span');
     badge.className='sub-badge';
-    if(s.cycle!=='yearly'){badge.classList.add('monthly');badge.textContent='Monthly';}
+    if(s.paused){badge.classList.add('paused');badge.textContent='Paused';}
+    else if(isSkipped){badge.classList.add('skipped');badge.textContent='Skipped';}
+    else if(s.cycle!=='yearly'){badge.classList.add('monthly');badge.textContent='Monthly';}
     else if(s.month===curMonth){badge.classList.add('yearly-due');badge.textContent='Due This Month';}
     else{badge.classList.add('yearly');badge.textContent='Yearly';}
     var amtWrap=document.createElement('div');
@@ -945,12 +952,15 @@ function renderSubs() {
     pillWrap.appendChild(pill);
     body.appendChild(pillWrap);
 
-    // Edit/Remove buttons
+    // Pause/Skip/Edit/Remove buttons
     var actDiv=document.createElement('div');
-    actDiv.style.cssText='display:flex;gap:8px;margin-top:10px;';
+    actDiv.style.cssText='display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;';
     var editBtn=document.createElement('button');editBtn.className='btn btn-b btn-sm';editBtn.textContent='Edit';
     var delBtn=document.createElement('button');delBtn.className='btn btn-r btn-sm';delBtn.textContent='Remove';
-    actDiv.appendChild(editBtn);actDiv.appendChild(delBtn);
+    var pauseBtn=document.createElement('button');pauseBtn.className='lnk-btn';pauseBtn.style.color=s.paused?'var(--accent)':'var(--accent3)';pauseBtn.textContent=s.paused?'Resume':'Pause';
+    var skipBtn=document.createElement('button');skipBtn.className='lnk-btn';skipBtn.style.color=((subPay[pid]||{})[s.id]||{}).skipped?'var(--accent)':'var(--accent4)';skipBtn.textContent=((subPay[pid]||{})[s.id]||{}).skipped?'Unskip':'Skip Period';
+    if(s.paused){skipBtn.style.opacity='0.4';skipBtn.style.pointerEvents='none';}
+    actDiv.appendChild(editBtn);actDiv.appendChild(pauseBtn);actDiv.appendChild(skipBtn);actDiv.appendChild(delBtn);
     body.appendChild(actDiv);
 
     var editContainer=document.createElement('div');
@@ -960,15 +970,17 @@ function renderSubs() {
     list.appendChild(row);
 
     // Wire events with closure
-    (function(sub,ph,eb,db,ec,chev){
+    (function(sub,ph,pauseb,skipb,eb,db,ec,chev){
       hdr.onclick=function(){
         var open=body.classList.toggle('open');
         chev.classList.toggle('open',open);
       };
       ph.onclick=function(ev){ev.stopPropagation();toggleSubPay(pid,sub.id);};
+      pauseb.onclick=function(ev){ev.stopPropagation();toggleSubPause(sub.id);};
+      skipb.onclick=function(ev){ev.stopPropagation();toggleSubSkip(pid,sub.id);};
       eb.onclick=function(ev){ev.stopPropagation();showEditSub(sub.id,ec);};
       db.onclick=function(ev){ev.stopPropagation();deleteSub(sub.id);};
-    })(s,pill,editBtn,delBtn,editContainer,chevEl);
+    })(s,pill,pauseBtn,skipBtn,editBtn,delBtn,editContainer,chevEl);
   });
 }
 
@@ -1074,6 +1086,24 @@ function saveSubEdit(id,container){
   subscriptions[idx].month=month;subscriptions[idx].year=year;
   if(container)container.innerHTML='';
   save();renderSubs();renderStats();toast('Subscription updated!');
+}
+
+function toggleSubPause(subId){
+  var idx=subscriptions.findIndex(function(s){return s.id===subId;});
+  if(idx<0)return;
+  subscriptions[idx].paused=!subscriptions[idx].paused;
+  save();renderSubs();renderBudget();renderStats();
+  toast(subscriptions[idx].paused?'Subscription paused':'Subscription resumed');
+}
+
+function toggleSubSkip(pid,subId){
+  if(!subPay[pid])subPay[pid]={};
+  if(!subPay[pid][subId])subPay[pid][subId]={paid:false,date:'',skipped:false};
+  subPay[pid][subId].skipped=!subPay[pid][subId].skipped;
+  // If skipping, unmark paid
+  if(subPay[pid][subId].skipped){subPay[pid][subId].paid=false;subPay[pid][subId].date='';}
+  save();renderSubs();renderBudget();renderStats();
+  toast(subPay[pid][subId].skipped?'Skipped this period':'Unskipped');
 }
 
 function toggleSubPay(pid,subId){
