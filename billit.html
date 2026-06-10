@@ -157,6 +157,20 @@ canvas{display:block;width:100%;}
 .del-confirm.show{display:block;}
 @keyframes slideIn{from{opacity:0;transform:translateX(8px);}to{opacity:1;transform:translateX(0);}}
 
+.backup-bar{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:10px;}
+.backup-bar.warn{border-color:rgba(255,209,102,0.4);background:rgba(255,209,102,0.06);}
+.backup-status{font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);}
+.backup-status.warn{color:var(--accent3);}
+.backup-btns{display:flex;gap:8px;flex-shrink:0;}
+.backup-btn{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-family:'DM Mono',monospace;font-size:11px;color:var(--text);cursor:pointer;transition:all 0.2s;}
+.backup-btn:hover{border-color:var(--accent);color:var(--accent);}
+.backup-btn.import{color:var(--accent4);border-color:rgba(123,140,255,0.3);}
+
+.sub-badge{display:inline-block;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:0.08em;text-transform:uppercase;padding:3px 8px;border-radius:99px;font-weight:500;flex-shrink:0;}
+.sub-badge.monthly{background:rgba(0,229,160,0.15);color:var(--accent);border:1px solid rgba(0,229,160,0.3);}
+.sub-badge.yearly-due{background:rgba(0,229,160,0.15);color:var(--accent);border:1px solid rgba(0,229,160,0.3);}
+.sub-badge.yearly{background:rgba(107,107,138,0.15);color:var(--muted);border:1px solid rgba(107,107,138,0.3);}
+
 .toast{position:fixed;bottom:calc(68px + var(--safe-bottom));left:50%;transform:translateX(-50%) translateY(20px);background:var(--accent);color:#000;padding:10px 20px;border-radius:99px;font-size:13px;font-weight:700;opacity:0;transition:all 0.3s;z-index:999;white-space:nowrap;pointer-events:none;}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
 </style>
@@ -196,6 +210,16 @@ canvas{display:block;width:100%;}
           <div class="fld"><label class="flbl">First Paycheck</label><input class="finp" id="setStart" type="date" value="2026-06-05"></div>
         </div>
         <button class="btn btn-g" id="saveSettings">Save &amp; Recalculate</button>
+      </div>
+      <div class="settings-card">
+        <div style="font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);font-family:'DM Mono',monospace;margin-bottom:10px;">Backup &amp; Restore</div>
+        <div class="backup-bar" id="backupBar">
+          <div class="backup-status" id="backupStatus">Never backed up</div>
+          <div class="backup-btns">
+            <button class="backup-btn" id="exportBtn">&#8595; Export</button>
+            <label class="backup-btn import" style="cursor:pointer;">&#8593; Import<input type="file" id="importFile" accept=".json" style="display:none;"></label>
+          </div>
+        </div>
       </div>
       <div class="settings-card">
         <div style="font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);font-family:'DM Mono',monospace;margin-bottom:10px;">Categories</div>
@@ -337,6 +361,89 @@ var subPay = {};
 var expenses = []; // flat array [{id,name,merchant,amount,cat,date,dateISO}]
 var CAT_COLORS = {'Housing':'#7b8cff','Transportation':'#ffd166','Utilities':'#00e5a0','Food':'#ff6b6b','Entertainment':'#ff9ff3','Subscriptions':'#00d4aa','Debt Payoff':'#ff4757','Other':'#6b6b8a'};
 var MONTHS = ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+var lastBackupDate = null;
+
+function getBackupData() {
+  return JSON.stringify({
+    BUDGET:BUDGET,
+    startDate:START_DATE.toISOString(),
+    bills:bills,
+    subscriptions:subscriptions,
+    billPay:billPay,
+    subPay:subPay,
+    expenses:expenses,
+    categories:categories,
+    exportedAt:new Date().toISOString(),
+    version:'billit_v4'
+  }, null, 2);
+}
+
+function exportBackup() {
+  var data = getBackupData();
+  var blob = new Blob([data], {type:'application/json'});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  var d = new Date();
+  a.download = 'billit-backup-'+d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate()+'.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  lastBackupDate = new Date().toISOString();
+  try { localStorage.setItem('billit_lastBackup', lastBackupDate); } catch(e) {}
+  renderBackupStatus();
+  toast('Backup saved!');
+}
+
+function importBackup(file) {
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(ev) {
+    try {
+      var s = JSON.parse(ev.target.result);
+      if (!s.bills && !s.subscriptions) { toast('Invalid backup file'); return; }
+      if (typeof s.BUDGET === 'number') BUDGET = s.BUDGET;
+      if (s.startDate) START_DATE = new Date(s.startDate);
+      if (s.bills && s.bills.length) bills = s.bills;
+      if (s.subscriptions) subscriptions = s.subscriptions;
+      if (s.billPay) billPay = s.billPay;
+      if (s.subPay) subPay = s.subPay;
+      if (s.expenses) expenses = s.expenses;
+      if (s.categories && s.categories.length) categories = s.categories;
+      save();
+      fullRender();
+      toast('Backup restored!');
+    } catch(e) { toast('Error reading backup file'); }
+  };
+  reader.readAsText(file);
+}
+
+function renderBackupStatus() {
+  var bar = document.getElementById('backupBar');
+  var status = document.getElementById('backupStatus');
+  if (!bar || !status) return;
+  try { lastBackupDate = lastBackupDate || localStorage.getItem('billit_lastBackup'); } catch(e) {}
+  if (!lastBackupDate) {
+    status.textContent = 'Never backed up — tap Export to save your data';
+    status.className = 'backup-status warn';
+    bar.className = 'backup-bar warn';
+    return;
+  }
+  var d = new Date(lastBackupDate);
+  var daysSince = Math.floor((new Date() - d) / (24*3600*1000));
+  var dateStr = d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+  if (daysSince >= 14) {
+    status.textContent = 'Last backup: '+dateStr+' — due for a new backup!';
+    status.className = 'backup-status warn';
+    bar.className = 'backup-bar warn';
+  } else {
+    status.textContent = 'Last backup: '+dateStr;
+    status.className = 'backup-status';
+    bar.className = 'backup-bar';
+  }
+}
 
 function save() {
   try {
@@ -719,7 +826,10 @@ function renderSubs() {
   summaryEl.innerHTML=subscriptions.length+' subscription'+(subscriptions.length!==1?'s':'')+' &nbsp;&middot;&nbsp; <span style="color:var(--accent3)">'+fm(monthlyTotal)+'</span>/mo';
   list.appendChild(summaryEl);
 
-  if(!subscriptions.length){list.innerHTML='<div class="empty">No subscriptions yet.</div>';return;}
+  if(!subscriptions.length){
+    var empty=document.createElement('div');empty.className='empty';empty.textContent='No subscriptions yet.';
+    list.appendChild(empty);return;
+  }
 
   // Sort: monthly by day, yearly at bottom unless due this month
   var sorted=subscriptions.slice().sort(function(a,b){
@@ -736,48 +846,72 @@ function renderSubs() {
     var sp=subPay[pid][s.id];
     var cycleLbl=s.cycle==='yearly'?'Yearly':'Monthly';
     var dueLbl=s.cycle==='yearly'&&s.month?'Due '+MONTHS[s.month]+(s.day?' '+s.day:'')+( s.year?' '+s.year:''):(s.day?'Bills on '+s.day+'th':'');
+    var col=catColor('Subscriptions');
 
-    // Collapsed row
+    // Row wrapper
     var row=document.createElement('div');
-    row.className='sub-row'+(sp.paid?' paid':'');
-    row.style.flexDirection='column';
+    row.className='bill-row'+(sp.paid?' done':'');
+    row.style.marginBottom='8px';
 
     // Header — always visible, tap to expand
     var hdr=document.createElement('div');
-    hdr.style.cssText='display:flex;justify-content:space-between;align-items:center;cursor:pointer;';
+    hdr.className='br-hd';
 
     var left=document.createElement('div');
-    var nameEl=document.createElement('div');nameEl.className='sub-name';nameEl.textContent=s.name;
-    var metaEl=document.createElement('div');metaEl.className='sub-meta';
-    metaEl.textContent=cycleLbl+(dueLbl?' · '+dueLbl:'')+(sp.paid?' · ✓ Paid '+sp.date:'');
+    var nameEl=document.createElement('div');nameEl.className='br-name';nameEl.textContent=s.name;
+    var metaEl=document.createElement('div');metaEl.className='br-meta';
+    var statusTxt=sp.paid?'&#10003; Paid':'Unpaid';
+    var statusCol=sp.paid?'var(--accent)':'var(--muted)';
+    metaEl.innerHTML=cycleLbl+(dueLbl?' &middot; '+dueLbl:'')+'&nbsp;|&nbsp;<span style="color:'+statusCol+'">'+statusTxt+'</span>';
     left.appendChild(nameEl);left.appendChild(metaEl);
 
     var right=document.createElement('div');
-    right.style.cssText='display:flex;align-items:center;gap:8px;flex-shrink:0;';
-    var amtEl=document.createElement('div');amtEl.className='sub-amt';amtEl.textContent=fm(s.amount);
-    var chevEl=document.createElement('span');chevEl.id='sChev_'+s.id;
-    chevEl.style.cssText='color:var(--muted);font-size:12px;transition:transform 0.25s;';chevEl.textContent='▾';
-    right.appendChild(amtEl);right.appendChild(chevEl);
+    right.className='br-right';
+    // Badge
+    var badge=document.createElement('span');
+    badge.className='sub-badge';
+    if(s.cycle!=='yearly'){badge.classList.add('monthly');badge.textContent='Monthly';}
+    else if(s.month===curMonth){badge.classList.add('yearly-due');badge.textContent='Due This Month';}
+    else{badge.classList.add('yearly');badge.textContent='Yearly';}
+    var amtWrap=document.createElement('div');
+    var amtEl=document.createElement('div');amtEl.className='br-amt';amtEl.style.color=col;amtEl.textContent=fm(s.amount);
+    var cycleEl=document.createElement('div');cycleEl.className='br-cycle';cycleEl.textContent=s.cycle==='yearly'?'per year':'per month';
+    amtWrap.appendChild(amtEl);amtWrap.appendChild(cycleEl);
+    var chevEl=document.createElement('span');chevEl.className='br-chev';chevEl.id='sChev_'+s.id;chevEl.innerHTML='&#9662;';
+    right.appendChild(badge);right.appendChild(amtWrap);right.appendChild(chevEl);
 
     hdr.appendChild(left);hdr.appendChild(right);
     row.appendChild(hdr);
 
     // Body — hidden by default
     var body=document.createElement('div');
+    body.className='br-body';
     body.id='sbody_'+s.id;
-    body.style.cssText='display:none;padding-top:10px;border-top:1px solid var(--border);margin-top:10px;';
 
+    // Payment pill
+    var pillWrap=document.createElement('div');
+    pillWrap.className='pay-pills';
+    var pill=document.createElement('button');
+    pill.className='pill-btn'+(sp.paid?' paid':'');
+    var pillLbl=document.createElement('div');pillLbl.className='pill-lbl';pillLbl.textContent=cycleLbl+' Payment';
+    var pillAmt=document.createElement('div');pillAmt.className='pill-amt';pillAmt.textContent=fm(s.amount);
+    var pillDate=document.createElement('div');pillDate.className='pill-date';
+    if(sp.paid&&sp.date)pillDate.textContent='Paid '+sp.date;
+    var pillStatus=document.createElement('div');pillStatus.className='pill-status';
+    pillStatus.style.color=sp.paid?'var(--accent)':'var(--muted)';
+    pillStatus.textContent=sp.paid?'✓ Paid':'Tap to mark paid';
+    pill.appendChild(pillLbl);pill.appendChild(pillAmt);
+    if(sp.paid&&sp.date)pill.appendChild(pillDate);
+    pill.appendChild(pillStatus);
+    pillWrap.appendChild(pill);
+    body.appendChild(pillWrap);
+
+    // Edit/Remove buttons
     var actDiv=document.createElement('div');
-    actDiv.style.cssText='display:flex;gap:8px;flex-wrap:wrap;align-items:center;';
-
-    var payBtn=document.createElement('button');
-    payBtn.className='sub-pay'+(sp.paid?' paid':'');
-    payBtn.textContent=sp.paid?'✓ Paid':'Mark Paid';
-
-    var editBtn=document.createElement('button');editBtn.className='lnk-btn';editBtn.textContent='edit';
-    var delBtn=document.createElement('button');delBtn.className='lnk-btn';delBtn.textContent='remove';
-
-    actDiv.appendChild(payBtn);actDiv.appendChild(editBtn);actDiv.appendChild(delBtn);
+    actDiv.style.cssText='display:flex;gap:8px;margin-top:10px;';
+    var editBtn=document.createElement('button');editBtn.className='btn btn-b btn-sm';editBtn.textContent='Edit';
+    var delBtn=document.createElement('button');delBtn.className='btn btn-r btn-sm';delBtn.textContent='Remove';
+    actDiv.appendChild(editBtn);actDiv.appendChild(delBtn);
     body.appendChild(actDiv);
 
     var editContainer=document.createElement('div');
@@ -787,12 +921,15 @@ function renderSubs() {
     list.appendChild(row);
 
     // Wire events with closure
-    (function(sub,pb,eb,db,ec){
-      hdr.onclick=function(){toggleSubBody('sbody_'+sub.id,sub.id);};
-      pb.onclick=function(ev){ev.stopPropagation();toggleSubPay(pid,sub.id);};
+    (function(sub,ph,eb,db,ec,chev){
+      hdr.onclick=function(){
+        var open=body.classList.toggle('open');
+        chev.classList.toggle('open',open);
+      };
+      ph.onclick=function(ev){ev.stopPropagation();toggleSubPay(pid,sub.id);};
       eb.onclick=function(ev){ev.stopPropagation();showEditSub(sub.id,ec);};
       db.onclick=function(ev){ev.stopPropagation();deleteSub(sub.id);};
-    })(s,payBtn,editBtn,delBtn,editContainer);
+    })(s,pill,editBtn,delBtn,editContainer,chevEl);
   });
 }
 
@@ -1201,7 +1338,7 @@ document.querySelectorAll('.sec-hd').forEach(function(hd){
     var t=document.getElementById(hd.dataset.target);if(!t)return;
     var c=t.classList.toggle('hidden');hd.classList.toggle('closed',c);
     // Re-render cat list when settings section is expanded
-    if(hd.dataset.target==='secSettings'&&!c)renderCatList();
+    if(hd.dataset.target==='secSettings'&&!c){renderCatList();renderBackupStatus();}
   });
 });
 
@@ -1270,6 +1407,17 @@ document.getElementById('addExpBtn').addEventListener('click',function(){
   document.getElementById('nEName').value='';document.getElementById('nEMerchant').value='';document.getElementById('nEAmt').value='';
   document.getElementById('addExpBd').classList.remove('open');document.getElementById('addExpHnt').textContent='tap to add';
   save();renderExpenses();renderBudget();renderStats();toast('Expense logged!');
+});
+
+// Use event delegation for backup buttons since they're inside a collapsed section
+document.addEventListener('click', function(ev){
+  if(ev.target && ev.target.id==='exportBtn') exportBackup();
+});
+document.addEventListener('change', function(ev){
+  if(ev.target && ev.target.id==='importFile'){
+    importBackup(ev.target.files[0]);
+    ev.target.value='';
+  }
 });
 
 document.getElementById('saveSettings').addEventListener('click',function(){
