@@ -176,6 +176,11 @@ canvas{display:block;width:100%;}
 .stats-filter-btn{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:7px 14px;font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);cursor:pointer;transition:all 0.2s;}
 .stats-filter-btn.active{background:rgba(0,229,160,0.12);border-color:rgba(0,229,160,0.4);color:var(--accent);}
 
+.tab-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px;}
+.tab-stat{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:10px 12px;text-align:center;}
+.tab-stat-val{font-family:'DM Mono',monospace;font-size:14px;font-weight:500;margin-bottom:2px;}
+.tab-stat-lbl{font-size:9px;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);font-family:'DM Mono',monospace;}
+
 .toast{position:fixed;bottom:calc(68px + var(--safe-bottom));left:50%;transform:translateX(-50%) translateY(20px);background:var(--accent);color:#000;padding:10px 20px;border-radius:99px;font-size:13px;font-weight:700;opacity:0;transition:all 0.3s;z-index:999;white-space:nowrap;pointer-events:none;}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
 </style>
@@ -243,6 +248,15 @@ canvas{display:block;width:100%;}
   <div class="page-tag">Billit</div>
   <div class="page-title">Pay Period Bills</div>
   <div class="page-sub" id="billsSub">Current period</div>
+  <div class="tab-summary" id="billsSummary">
+    <div class="tab-stat">
+      <div class="tab-stat-val" id="billsCommitted" style="color:var(--accent3)">$0</div>
+      <div class="tab-stat-lbl">Committed</div>
+      <div id="billsCommittedSub" style="font-size:9px;color:var(--muted);font-family:'DM Mono',monospace;margin-top:2px;"></div>
+    </div>
+    <div class="tab-stat"><div class="tab-stat-val" id="billsPaidAmt" style="color:var(--accent)">$0</div><div class="tab-stat-lbl">Paid</div></div>
+    <div class="tab-stat"><div class="tab-stat-val" id="billsLeft" style="color:var(--accent2)">$0</div><div class="tab-stat-lbl">Left</div></div>
+  </div>
   <div class="period-bar">
     <button class="pnav" id="bPrev">&#8249;</button>
     <div><div class="p-lbl" id="bPLbl">Jun 5 - Jun 18</div><div class="p-sub" id="bPNum">Pay Period 1</div></div>
@@ -277,6 +291,11 @@ canvas{display:block;width:100%;}
   <div class="page-tag">Billit</div>
   <div class="page-title">Subs &amp; Streams</div>
   <div class="page-sub">Monthly &amp; yearly subscriptions</div>
+  <div class="tab-summary" id="subsSummary">
+    <div class="tab-stat"><div class="tab-stat-val" id="subsTotal" style="color:var(--accent3)">$0</div><div class="tab-stat-lbl">Total Subs</div></div>
+    <div class="tab-stat"><div class="tab-stat-val" id="subsPaid" style="color:var(--accent)">$0</div><div class="tab-stat-lbl">Paid</div></div>
+    <div class="tab-stat"><div class="tab-stat-val" id="subsLeft" style="color:var(--accent2)">$0</div><div class="tab-stat-lbl">Left</div></div>
+  </div>
   <div class="ap">
     <div class="ap-hd" id="addSubHd"><div class="ap-title"><span class="ap-dot"></span>Add Subscription</div><span class="ap-hint" id="addSubHnt">tap to add</span></div>
     <div class="ap-body" id="addSubBd">
@@ -301,6 +320,11 @@ canvas{display:block;width:100%;}
   <div class="page-tag">Billit</div>
   <div class="page-title">Daily Expenses</div>
   <div class="page-sub" id="expPeriodSub">Current period</div>
+  <div class="tab-summary" id="dailySummary">
+    <div class="tab-stat"><div class="tab-stat-val" id="dailySpent" style="color:var(--accent2)">$0</div><div class="tab-stat-lbl">Spent</div></div>
+    <div class="tab-stat"><div class="tab-stat-val" id="dailyDeposits" style="color:var(--accent)">$0</div><div class="tab-stat-lbl">Deposits</div></div>
+    <div class="tab-stat"><div class="tab-stat-val" id="dailyLeft" style="color:var(--accent3)">$0</div><div class="tab-stat-lbl">Left</div></div>
+  </div>
   <div class="period-bar">
     <button class="pnav" id="ePrev">&#8249;</button>
     <div><div class="p-lbl" id="ePLbl">Jun 5 - Jun 18</div><div class="p-sub" id="ePNum">Pay Period 1</div></div>
@@ -617,7 +641,7 @@ function renderBudget() {
   document.getElementById('sLeft').textContent = fm(rem);
   var bar=document.getElementById('hBar');
   bar.style.width=pct.toFixed(1)+'%';
-  bar.style.background=pct<20?'#ff6b6b':pct<50?'#ffd166':'#00e5a0';
+  bar.style.background=pct<=0?'#ff6b6b':pct<10?'#ffd166':'#00e5a0';
   var ol=document.getElementById('ovList'); ol.innerHTML='';
   bills.forEach(function(b){
     var pa=getPaidAmt(pid,b), ta=b.type==='manualsplit'?(b.pay1Amt||0)+(b.pay2Amt||0):b.type==='split'||b.type==='autowdsplit'?b.perPay*2:b.perPay, pct2=ta>0?Math.min(pa/ta*100,100):0, col=catColor(b.cat);
@@ -631,6 +655,24 @@ function renderBills() {
   document.getElementById('bPNum').textContent = 'Pay Period '+(curPeriod+1);
   var list=document.getElementById('billList'); list.innerHTML='';
   if (!bills.length) { list.innerHTML='<div class="empty">No bills yet.<br>Tap Add a Bill above.</div>'; return; }
+  // Update bills summary
+  // Period committed = what's due this specific pay period
+  var bPeriodCommitted=bills.reduce(function(t,b){
+    var isSplitType=b.type==='split'||b.type==='autowdsplit'||b.type==='manualsplit';
+    return t+(isSplitType?b.perPay:b.perPay);
+  },0);
+  // Monthly committed = full monthly total
+  var bMonthlyCommitted=bills.reduce(function(t,b){
+    var isSplitType=b.type==='split'||b.type==='autowdsplit'||b.type==='manualsplit';
+    return t+(isSplitType?b.type==='manualsplit'?(b.pay1Amt||0)+(b.pay2Amt||0):b.perPay*2:b.perPay);
+  },0);
+  var bPaid=bills.reduce(function(t,b){return t+getPaidAmt(curPeriod,b);},0);
+  var bLeft=BUDGET-getTotalPaid(nowPeriod());
+  var elBC=document.getElementById('billsCommitted');if(elBC)elBC.textContent=fm(bPeriodCommitted);
+  var elBCS=document.getElementById('billsCommittedSub');if(elBCS)elBCS.textContent=fm(bMonthlyCommitted)+'/mo';
+  var elBP=document.getElementById('billsPaidAmt');if(elBP)elBP.textContent=fm(bPaid);
+  var elBL=document.getElementById('billsLeft');if(elBL){elBL.textContent=fm(bLeft);elBL.style.color=bLeft<0?'var(--accent2)':bLeft<100?'var(--accent3)':'var(--accent)';}
+
   bills.forEach(function(b) {
     var pid=curPeriod; ensureBP(pid,b.id); var p=billPay[pid][b.id];
     var isSplit=b.type==='split'||b.type==='autowdsplit'||b.type==='manualsplit', isAuto=b.type==='auto'||b.type==='autowdsplit', isAutoSplit=b.type==='autowdsplit', isManualSplit=b.type==='manualsplit';
@@ -881,6 +923,15 @@ function renderSubs() {
     if(!aYearly&&bYearly)return -1;
     return (a.day||31)-(b.day||31);
   });
+
+  // Update subs summary
+  var pid2=nowPeriod();
+  var sTotal=subscriptions.filter(function(s){return !s.paused&&!isSubSkippedThisMonth(s);}).reduce(function(t,s){return t+s.amount;},0);
+  var sPaid=subscriptions.reduce(function(t,s){var sp=(subPay[pid2]||{})[s.id]||{};return sp.paid?t+s.amount:t;},0);
+  var sLeft=BUDGET-getTotalPaid(pid2);
+  var elST=document.getElementById('subsTotal');if(elST)elST.textContent=fm(sTotal);
+  var elSP=document.getElementById('subsPaid');if(elSP)elSP.textContent=fm(sPaid);
+  var elSL=document.getElementById('subsLeft');if(elSL){elSL.textContent=fm(sLeft);elSL.style.color=sLeft<0?'var(--accent2)':sLeft<100?'var(--accent3)':'var(--accent)';}
 
   sorted.forEach(function(s){
     if(!subPay[pid])subPay[pid]={};
@@ -1177,6 +1228,14 @@ function renderExpenses() {
   hdr.innerHTML=hdrParts.join(' &middot; ')+' &nbsp;|&nbsp; Net: <span style="color:'+(total<0?'var(--accent)':'var(--accent2)')+'">'+
     (total<0?'+':'')+fm(Math.abs(total))+'</span>';
   list.appendChild(hdr);
+
+  // Update daily summary
+  var dSpent=exps.filter(function(e){return e.type!=='deposit';}).reduce(function(t,e){return t+e.amount;},0);
+  var dDeps=exps.filter(function(e){return e.type==='deposit';}).reduce(function(t,e){return t+e.amount;},0);
+  var dLeft=BUDGET-getTotalPaid(nowPeriod());
+  var elDS=document.getElementById('dailySpent');if(elDS)elDS.textContent=fm(dSpent);
+  var elDD=document.getElementById('dailyDeposits');if(elDD)elDD.textContent=fm(dDeps);
+  var elDL=document.getElementById('dailyLeft');if(elDL){elDL.textContent=fm(dLeft);elDL.style.color=dLeft<0?'var(--accent2)':dLeft<100?'var(--accent3)':'var(--accent)';}
 
   // Sort: primary by date newest first, secondary by last entered first
   var sorted=exps.slice().sort(function(a,b){
