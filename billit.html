@@ -1419,22 +1419,22 @@ function exportStatsPdf(){
   var billRows='';
   bills.forEach(function(b){
     var paid=pids.reduce(function(t,pid){return t+getPaidAmt(pid,b);},0);
-    if(paid>0) billRows+='<tr><td>'+b.name+'</td><td>'+b.cat+'</td><td style="text-align:right;color:#00e5a0">'+fm(paid)+'</td></tr>';
+    if(paid>0) billRows+='<tr><td>'+b.name+'</td><td>'+b.cat+'</td><td style="text-align:right;" class="c-bill">'+fm(paid)+'</td></tr>';
   });
 
   // Build expense details
   var expRows='';
   pids.forEach(function(pid){
     getExpensesForPeriod(pid).forEach(function(e){
-      var color=e.type==='deposit'?'#00e5a0':'#ff6b6b';
+      var expClass=e.type==='deposit'?'c-deposit':'c-expense';
       var prefix=e.type==='deposit'?'+ ':'';
-      expRows+='<tr><td>'+e.date+'</td><td>'+e.name+(e.merchant?' ('+e.merchant+')':'')+'</td><td>'+e.cat+'</td><td style="text-align:right;color:'+color+'">'+prefix+fm(e.amount)+'</td></tr>';
+      expRows+='<tr><td>'+e.date+'</td><td>'+e.name+(e.merchant?' ('+e.merchant+')':'')+'</td><td>'+e.cat+'</td><td style="text-align:right;" class="'+expClass+'">'+prefix+fm(e.amount)+'</td></tr>';
     });
   });
 
   var catRows=active.map(function(c){
     var pct=total>0?(catTotals[c]/total*100).toFixed(1):0;
-    return '<tr><td>'+c+'</td><td style="text-align:right">'+pct+'%</td><td style="text-align:right;color:#00e5a0">'+fm(catTotals[c])+'</td></tr>';
+    return '<tr><td>'+c+'</td><td style="text-align:right">'+pct+'%</td><td style="text-align:right;color:#1a1a2e">'+fm(catTotals[c])+'</td></tr>';
   }).join('');
 
   var totalBudget=BUDGET*pids.length;
@@ -1445,22 +1445,29 @@ function exportStatsPdf(){
     '<style>'+
       'body{font-family:Arial,sans-serif;color:#1a1a2e;padding:24px;font-size:12px;}'+
       'h1{font-size:22px;margin-bottom:4px;color:#0a0a1a;}'+
-      'h2{font-size:14px;margin:20px 0 8px;color:#333;border-bottom:2px solid #00e5a0;padding-bottom:4px;}'+
+      'h2{font-size:14px;margin:20px 0 8px;color:#333;border-bottom:2px solid #00c48c;padding-bottom:4px;}'+
       'p{color:#666;font-size:11px;margin-bottom:16px;}'+
       'table{width:100%;border-collapse:collapse;margin-bottom:16px;}'+
       'th{background:#f0f0f0;padding:6px 8px;text-align:left;font-size:11px;font-weight:600;}'+
-      'td{padding:5px 8px;border-bottom:1px solid #eee;font-size:11px;}'+
+      'td{padding:5px 8px;border-bottom:1px solid #eee;font-size:11px;color:#1a1a2e;}'+
       '.summary{display:flex;gap:16px;margin-bottom:16px;}'+
       '.scard{background:#f8f8f8;border-radius:8px;padding:10px 14px;flex:1;text-align:center;}'+
-      '.scard-val{font-size:16px;font-weight:700;color:#00e5a0;}'+
+      '.scard-val{font-size:16px;font-weight:700;}'+
       '.scard-lbl{font-size:10px;color:#888;margin-top:2px;}'+
+      '.c-budget{color:#1a1a2e;}'+
+      '.c-paid{color:#e53935;}'+
+      '.c-remain-pos{color:#00a86b;}'+
+      '.c-remain-neg{color:#e53935;}'+
+      '.c-bill{color:#00a86b;}'+
+      '.c-expense{color:#e53935;}'+
+      '.c-deposit{color:#00a86b;}'+
     '</style></head><body>'+
     '<h1>Billit — '+title+'</h1>'+
     '<p>Generated '+new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})+'</p>'+
     '<div class="summary">'+
-      '<div class="scard"><div class="scard-val">'+fm(totalBudget)+'</div><div class="scard-lbl">Total Budget</div></div>'+
-      '<div class="scard"><div class="scard-val">'+fm(paid2)+'</div><div class="scard-lbl">Paid Out</div></div>'+
-      '<div class="scard"><div class="scard-val">'+fm(Math.max(0,totalBudget-paid2))+'</div><div class="scard-lbl">Remaining</div></div>'+
+      '<div class="scard"><div class="scard-val c-budget">'+fm(totalBudget)+'</div><div class="scard-lbl">Total Budget</div></div>'+
+      '<div class="scard"><div class="scard-val c-paid">'+fm(paid2)+'</div><div class="scard-lbl">Paid Out</div></div>'+
+      '<div class="scard"><div class="scard-val '+(totalBudget-paid2>=0?'c-remain-pos':'c-remain-neg')+'">'+fm(Math.max(0,totalBudget-paid2))+'</div><div class="scard-lbl">Remaining</div></div>'+
     '</div>'+
     '<h2>Spending by Category</h2>'+
     '<table><tr><th>Category</th><th style="text-align:right">%</th><th style="text-align:right">Amount</th></tr>'+catRows+'</table>'+
