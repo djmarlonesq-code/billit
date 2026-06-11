@@ -1791,7 +1791,7 @@ function renderReserves(){
 
     // Action buttons
     var actDiv=document.createElement('div');actDiv.style.cssText='display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;';
-    var contributeBtn=document.createElement('button');contributeBtn.className='btn btn-g btn-sm';contributeBtn.textContent='&#10003; Contribute';
+    var contributeBtn=document.createElement('button');contributeBtn.className='btn btn-g btn-sm';contributeBtn.innerHTML='&#10003; Contribute';
     var addBtn=document.createElement('button');addBtn.className='btn btn-sm';addBtn.style.cssText='background:rgba(0,229,160,0.1);color:var(--accent);border:1px solid rgba(0,229,160,0.3);';addBtn.textContent='+ Add Funds';
     var withdrawBtn=document.createElement('button');withdrawBtn.className='lnk-btn';withdrawBtn.style.color='var(--accent3)';withdrawBtn.textContent='Withdraw';
     var transferBtn=document.createElement('button');transferBtn.className='lnk-btn';transferBtn.style.color='var(--accent4)';transferBtn.textContent='Transfer';
