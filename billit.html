@@ -1879,7 +1879,7 @@ function showReserveAddFunds(id,container){
       '</div>'+
       '<div class="ef-btns">'+
         '<button class="btn btn-g btn-sm" id="rafSave_'+id+'">Add</button>'+
-        '<button class="btn btn-sm" style="background:none;color:var(--muted);border:1px solid var(--border);" class="rCancel">Cancel</button>'+
+        '<button class="btn btn-sm rCancel" style="background:none;color:var(--muted);border:1px solid var(--border);">Cancel</button>'+
       '</div>'+
     '</div>';
   setTimeout(function(){
@@ -1920,7 +1920,7 @@ function showReserveWithdraw(id,container){
       '<div class="frow full"><div class="fld"><label class="flbl">Amount ($) — Available: '+fm(r.savedAmt||0)+'</label><input class="finp" id="rwAmt_'+id+'" type="number" step="0.01" placeholder="0.00" onkeyup="autoDecimal(this)"></div></div>'+
       '<div class="ef-btns">'+
         '<button class="btn btn-g btn-sm" id="rwSave_'+id+'">Withdraw</button>'+
-        '<button class="btn btn-sm" style="background:none;color:var(--muted);border:1px solid var(--border);" class="rCancel">Cancel</button>'+
+        '<button class="btn btn-sm rCancel" style="background:none;color:var(--muted);border:1px solid var(--border);">Cancel</button>'+
       '</div>'+
     '</div>';
   setTimeout(function(){
@@ -1961,7 +1961,7 @@ function showReserveTransfer(id,container){
       '</div>'+
       '<div class="ef-btns">'+
         '<button class="btn btn-g btn-sm" id="rtSave_'+id+'">Transfer</button>'+
-        '<button class="btn btn-sm" style="background:none;color:var(--muted);border:1px solid var(--border);" class="rCancel">Cancel</button>'+
+        '<button class="btn btn-sm rCancel" style="background:none;color:var(--muted);border:1px solid var(--border);">Cancel</button>'+
       '</div>'+
     '</div>';
   setTimeout(function(){
@@ -2073,7 +2073,7 @@ function showReserveRemove(id,container){
       (others.length?'<div class="frow full" id="rrTransferDest_'+id+'"><div class="fld"><label class="flbl">Transfer To</label><select class="fsel" id="rrDest_'+id+'">'+others.map(function(x){return '<option value="'+x.id+'">'+x.name+'</option>';}).join('')+'</select></div></div>':'') +
       '<div class="ef-btns">'+
         '<button class="btn btn-r btn-sm" id="rrSave_'+id+'">Confirm Remove</button>'+
-        '<button class="btn btn-sm" style="background:none;color:var(--muted);border:1px solid var(--border);" class="rCancel">Cancel</button>'+
+        '<button class="btn btn-sm rCancel" style="background:none;color:var(--muted);border:1px solid var(--border);">Cancel</button>'+
       '</div>'+
     '</div>';
   setTimeout(function(){
@@ -2268,9 +2268,11 @@ document.getElementById('ePrev').addEventListener('click',function(){if(expCurPe
 document.getElementById('eNext').addEventListener('click',function(){expCurPeriod++;renderExpenses();});
 
 document.addEventListener('click', function(ev){
-  if(ev.target && ev.target.classList.contains('rCancel')){
-    var form=ev.target.closest('.edit-form');
-    if(form&&form.parentElement)form.parentElement.innerHTML='';
+  var el=ev.target;
+  if(el && el.classList && el.classList.contains('rCancel')){
+    ev.stopPropagation();
+    var container=el.closest('[id^="rForm_"]')||el.closest('[id^="editSubForm_"]')||el.closest('[id^="editBillForm_"]')||el.closest('[id^="editEForm_"]');
+    if(container)container.innerHTML='';
   }
 });
 
