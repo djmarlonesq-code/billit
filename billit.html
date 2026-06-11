@@ -1809,15 +1809,15 @@ function renderReserves(){
     row.appendChild(body);
     list.appendChild(row);
 
-    (function(res,cb,ab,wb,tb,eb,rb,fd,ch){
-      hdr.onclick=function(){var open=body.classList.toggle('open');ch.classList.toggle('open',open);};
+    (function(res,cb,ab,wb,tb,eb,rb,fd,ch,bd){
+      hdr.onclick=function(){var open=bd.classList.toggle('open');ch.classList.toggle('open',open);};
       cb.onclick=function(ev){ev.stopPropagation();contributeReserve(res.id);};
-      ab.onclick=function(ev){ev.stopPropagation();showReserveAddFunds(res.id,fd);};
-      wb.onclick=function(ev){ev.stopPropagation();showReserveWithdraw(res.id,fd);};
-      tb.onclick=function(ev){ev.stopPropagation();showReserveTransfer(res.id,fd);};
-      eb.onclick=function(ev){ev.stopPropagation();showReserveEdit(res.id,fd);};
-      rb.onclick=function(ev){ev.stopPropagation();showReserveRemove(res.id,fd);};
-    })(r,contributeBtn,addBtn,withdrawBtn,transferBtn,editBtn,removeBtn,formDiv,chevEl);
+      ab.onclick=function(ev){ev.stopPropagation();if(!bd.classList.contains('open')){bd.classList.add('open');ch.classList.add('open');}showReserveAddFunds(res.id,fd);};
+      wb.onclick=function(ev){ev.stopPropagation();if(!bd.classList.contains('open')){bd.classList.add('open');ch.classList.add('open');}showReserveWithdraw(res.id,fd);};
+      tb.onclick=function(ev){ev.stopPropagation();if(!bd.classList.contains('open')){bd.classList.add('open');ch.classList.add('open');}showReserveTransfer(res.id,fd);};
+      eb.onclick=function(ev){ev.stopPropagation();if(!bd.classList.contains('open')){bd.classList.add('open');ch.classList.add('open');}showReserveEdit(res.id,fd);};
+      rb.onclick=function(ev){ev.stopPropagation();if(!bd.classList.contains('open')){bd.classList.add('open');ch.classList.add('open');}showReserveRemove(res.id,fd);};
+    })(r,contributeBtn,addBtn,withdrawBtn,transferBtn,editBtn,removeBtn,formDiv,chevEl,body);
   });
 
   // Archived
