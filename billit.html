@@ -1973,11 +1973,21 @@ function showReserveEdit(id,container){
   var lN=document.createElement('label');lN.className='flbl';lN.textContent='Goal Name';
   var iN=document.createElement('input');iN.className='finp';iN.type='text';iN.id='reN_'+id;iN.value=r.name;
   fN.appendChild(lN);fN.appendChild(iN);
-  var fT=document.createElement('div');fT.className='fld';
-  var lT=document.createElement('label');lT.className='flbl';lT.textContent='Target ($)';
-  var iT=document.createElement('input');iT.className='finp';iT.type='number';iT.step='0.01';iT.id='reT_'+id;iT.value=(r.targetAmt||0).toFixed(2);iT.onkeyup=function(){autoDecimal(this);};
-  fT.appendChild(lT);fT.appendChild(iT);
-  r1.appendChild(fN);r1.appendChild(fT);form.appendChild(r1);
+  var fTy=document.createElement('div');fTy.className='fld';
+  var lTy=document.createElement('label');lTy.className='flbl';lTy.textContent='Goal Type';
+  var sTy=document.createElement('select');sTy.className='fsel';sTy.id='reTy_'+id;
+  [{v:'goal',l:'Purchase Goal'},{v:'fund',l:'Standing Fund'}].forEach(function(o){
+    var opt=document.createElement('option');opt.value=o.v;opt.textContent=o.l;
+    if(o.v===r.type)opt.selected=true;sTy.appendChild(opt);
+  });
+  fTy.appendChild(lTy);fTy.appendChild(sTy);
+  r1.appendChild(fN);r1.appendChild(fTy);form.appendChild(r1);
+  var r1b=document.createElement('div');r1b.className='frow';
+  var fTgt=document.createElement('div');fTgt.className='fld';
+  var lTgt=document.createElement('label');lTgt.className='flbl';lTgt.textContent='Target ($)';
+  var iTgt=document.createElement('input');iTgt.className='finp';iTgt.type='number';iTgt.step='0.01';iTgt.id='reT_'+id;iTgt.value=(r.targetAmt||0).toFixed(2);iTgt.onkeyup=function(){autoDecimal(this);};
+  fTgt.appendChild(lTgt);fTgt.appendChild(iTgt);
+  r1b.appendChild(fTgt);form.appendChild(r1b);
   var r2=document.createElement('div');r2.className='frow';
   var fD=document.createElement('div');fD.className='fld';
   var lD=document.createElement('label');lD.className='flbl';lD.textContent='Target Date';
@@ -2005,7 +2015,9 @@ function saveReserveEdit(id,container){
   var date=document.getElementById('reD_'+id).value;
   var pc=parseFloat(document.getElementById('rePC_'+id).value)||0;
   if(!name){toast('Enter a name');return;}
+  var type=document.getElementById('reTy_'+id)?document.getElementById('reTy_'+id).value:reserves[idx].type;
   reserves[idx].name=name;reserves[idx].targetAmt=target;
+  reserves[idx].type=type;
   reserves[idx].targetDate=date||null;reserves[idx].perCheck=pc||null;
   if(container)container.innerHTML='';
   save();renderReserves();toast('Goal updated!');
