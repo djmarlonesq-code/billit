@@ -683,8 +683,6 @@ function getTotalPaid(pid) {
     if(e.type==='deposit') t-=e.amount;
     else t+=e.amount;
   });
-  // Add reserve per-check deductions
-  t+=getTotalReserveDeductions();
   return t;
 }
 
@@ -1793,12 +1791,13 @@ function renderReserves(){
 
     // Action buttons
     var actDiv=document.createElement('div');actDiv.style.cssText='display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;';
-    var addBtn=document.createElement('button');addBtn.className='btn btn-g btn-sm';addBtn.textContent='+ Add Funds';
+    var contributeBtn=document.createElement('button');contributeBtn.className='btn btn-g btn-sm';contributeBtn.textContent='&#10003; Contribute';
+    var addBtn=document.createElement('button');addBtn.className='btn btn-sm';addBtn.style.cssText='background:rgba(0,229,160,0.1);color:var(--accent);border:1px solid rgba(0,229,160,0.3);';addBtn.textContent='+ Add Funds';
     var withdrawBtn=document.createElement('button');withdrawBtn.className='lnk-btn';withdrawBtn.style.color='var(--accent3)';withdrawBtn.textContent='Withdraw';
     var transferBtn=document.createElement('button');transferBtn.className='lnk-btn';transferBtn.style.color='var(--accent4)';transferBtn.textContent='Transfer';
     var editBtn=document.createElement('button');editBtn.className='lnk-btn';editBtn.textContent='edit';
     var removeBtn=document.createElement('button');removeBtn.className='lnk-btn';removeBtn.style.color='var(--accent2)';removeBtn.textContent='remove';
-    actDiv.appendChild(addBtn);actDiv.appendChild(withdrawBtn);actDiv.appendChild(transferBtn);
+    actDiv.appendChild(contributeBtn);actDiv.appendChild(addBtn);actDiv.appendChild(withdrawBtn);actDiv.appendChild(transferBtn);
     actDiv.appendChild(editBtn);actDiv.appendChild(removeBtn);
     body.appendChild(actDiv);
 
@@ -1808,14 +1807,15 @@ function renderReserves(){
     row.appendChild(body);
     list.appendChild(row);
 
-    (function(res,ab,wb,tb,eb,rb,fd,ch){
+    (function(res,cb,ab,wb,tb,eb,rb,fd,ch){
       hdr.onclick=function(){var open=body.classList.toggle('open');ch.classList.toggle('open',open);};
+      cb.onclick=function(ev){ev.stopPropagation();contributeReserve(res.id);};
       ab.onclick=function(ev){ev.stopPropagation();showReserveAddFunds(res.id,fd);};
       wb.onclick=function(ev){ev.stopPropagation();showReserveWithdraw(res.id,fd);};
       tb.onclick=function(ev){ev.stopPropagation();showReserveTransfer(res.id,fd);};
       eb.onclick=function(ev){ev.stopPropagation();showReserveEdit(res.id,fd);};
       rb.onclick=function(ev){ev.stopPropagation();showReserveRemove(res.id,fd);};
-    })(r,addBtn,withdrawBtn,transferBtn,editBtn,removeBtn,formDiv,chevEl);
+    })(r,contributeBtn,addBtn,withdrawBtn,transferBtn,editBtn,removeBtn,formDiv,chevEl);
   });
 
   // Archived
@@ -1838,6 +1838,24 @@ function renderReserves(){
   }
 
   renderBudget();
+}
+
+function contributeReserve(id){
+  var idx=reserves.findIndex(function(r){return r.id===id;});
+  if(idx<0)return;
+  var r=reserves[idx];
+  var pc=getReservePerCheck(r);
+  if(!pc){toast('Set a per-check amount first');return;}
+  // Add per-check amount to saved
+  reserves[idx].savedAmt=(r.savedAmt||0)+pc;
+  reserves[idx].history=reserves[idx].history||[];
+  reserves[idx].history.push({type:'contribute',amt:pc,date:fmtShort(new Date()),note:'Per-check contribution'});
+  // Deduct from budget - log as expense in Daily
+  var pid=nowPeriod();
+  if(!expenses[pid])expenses[pid]=[];
+  expenses[pid].push({id:uid(),name:'Goal Transfer - '+r.name,merchant:'Goal Transfer',amount:pc,cat:'Goal Transfer',date:fmtShort(new Date()),dateISO:fmtISO(new Date()),type:'expense'});
+  save();renderReserves();renderBudget();renderExpenses();
+  toast(fm(pc)+' contributed to '+r.name+'!');
 }
 
 function showReserveAddFunds(id,container){
