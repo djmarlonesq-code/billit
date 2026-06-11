@@ -528,6 +528,7 @@ function importBackup(file) {
       if (s.subPay) subPay = s.subPay;
       if (s.expenses) expenses = s.expenses;
       if (s.categories && s.categories.length) categories = s.categories;
+      if (s.reserves) reserves = s.reserves;
       save();
       fullRender();
       toast('Backup restored!');
@@ -598,6 +599,7 @@ function load() {
       }
     }
     if (s.categories && s.categories.length) categories = s.categories;
+    if (s.reserves) reserves = s.reserves;
     save();
   } catch(e) {}
 }
