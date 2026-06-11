@@ -1766,6 +1766,8 @@ function renderReserves(){
     var metaTxt=(r.type==='fund'?'Standing Fund':'Goal');
     if(r.targetDate){var d=new Date(r.targetDate+'T00:00:00');metaTxt+=' &middot; Due '+d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});}
     if(pLeft!==null)metaTxt+=' &middot; <span style="color:var(--accent4)">'+pLeft+' checks left</span>';
+    metaTxt+='<br><span style="color:var(--accent)">'+fm(r.savedAmt||0)+' saved</span>';
+    if(r.targetAmt>0)metaTxt+='<span style="color:var(--muted)"> of '+fm(r.targetAmt)+'</span>';
     metaEl.innerHTML=metaTxt;
     left.appendChild(nameEl);left.appendChild(metaEl);
 
