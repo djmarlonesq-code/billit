@@ -315,6 +315,59 @@ canvas{display:block;width:100%;}
   <div id="subList"></div>
 </div>
 
+<!-- RESERVES -->
+<div class="page" id="page-reserves">
+  <div class="page-tag">Billit</div>
+  <div class="page-title">Re<span>serves</span></div>
+  <div class="page-sub" id="reservesSub">Your savings goals</div>
+
+  <!-- Summary line -->
+  <div id="reservesSummaryLine" style="font-size:11px;color:var(--muted);margin-bottom:12px;padding:0 2px;"></div>
+
+  <!-- Stat cards -->
+  <div class="tab-summary" style="margin-bottom:14px;">
+    <div class="tab-stat"><div class="tab-stat-val" id="rGoals" style="color:var(--accent3)">$0</div><div class="tab-stat-lbl">Goals</div></div>
+    <div class="tab-stat"><div class="tab-stat-val" id="rSaved" style="color:var(--accent)">$0</div><div class="tab-stat-lbl">Saved</div></div>
+    <div class="tab-stat"><div class="tab-stat-val" id="rRemain" style="color:var(--accent2)">$0</div><div class="tab-stat-lbl">Remaining</div></div>
+  </div>
+
+  <!-- Add Goal -->
+  <div class="ap" id="addReserveAp">
+    <div class="ap-hd" id="addReserveHd">
+      <div class="ap-title"><span class="ap-dot"></span>Add Goal</div>
+      <span class="ap-hint" id="addReserveHnt">tap to add</span>
+    </div>
+    <div class="ap-body" id="addReserveBd">
+      <div class="frow full"><div class="fld"><label class="flbl">Goal Name</label><input class="finp" id="nRName" type="text" placeholder="e.g. Vacation Fund, DeWalt Planer"></div></div>
+      <div class="frow">
+        <div class="fld"><label class="flbl">Goal Type</label>
+          <select class="fsel" id="nRType" onchange="onReserveTypeChange()">
+            <option value="goal">Purchase Goal</option>
+            <option value="fund">Standing Fund</option>
+          </select>
+        </div>
+        <div class="fld"><label class="flbl">Target Amount ($)</label><input class="finp" id="nRTarget" type="number" step="0.01" placeholder="0.00" onkeyup="autoDecimal(this);calcReservePerCheck()"></div>
+      </div>
+      <div class="frow" id="nRDateWrap">
+        <div class="fld"><label class="flbl">Target Date (optional)</label><input class="finp" id="nRDate" type="date" onchange="calcReservePerCheck()"></div>
+        <div class="fld"><label class="flbl">Per Check ($) — auto</label><input class="finp" id="nRPerCheck" type="number" step="0.01" placeholder="0.00" onkeyup="autoDecimal(this)" style="opacity:0.7"></div>
+      </div>
+      <div class="frow" id="nRPerCheckManualWrap" style="display:none">
+        <div class="fld"><label class="flbl">Per Check ($)</label><input class="finp" id="nRPerCheckManual" type="number" step="0.01" placeholder="0.00" onkeyup="autoDecimal(this)"></div>
+      </div>
+      <button class="btn btn-g" id="addReserveBtn">+ Add Goal</button>
+    </div>
+  </div>
+
+  <div id="reserveList"></div>
+
+  <!-- Archived section -->
+  <div class="sec" style="margin-top:8px;">
+    <div class="sec-hd closed" data-target="secArchived"><span class="sec-lbl">Archived Goals</span><div class="sec-line"></div><span class="sec-chev">&#9662;</span></div>
+    <div class="sec-body hidden" id="secArchived"><div id="archivedList"></div></div>
+  </div>
+</div>
+
 <!-- EXPENSES -->
 <div class="page" id="page-expenses">
   <div class="page-tag">Billit</div>
@@ -362,8 +415,8 @@ canvas{display:block;width:100%;}
   <!-- Stats filter bar -->
   <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:14px;">
     <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
-      <button class="stats-filter-btn active" id="sfCurrent" onclick="setStatsFilter('current')">This Period</button>
-      <button class="stats-filter-btn" id="sfOverall" onclick="setStatsFilter('overall')">Overall</button>
+      <button class="stats-filter-btn" id="sfCurrent" onclick="setStatsFilter('current')">This Period</button>
+      <button class="stats-filter-btn active" id="sfOverall" onclick="setStatsFilter('overall')">Overall</button>
       <button class="stats-filter-btn" id="sfCustom" onclick="setStatsFilter('custom')">Custom</button>
     </div>
     <div id="statsCustomRange" style="display:none;">
@@ -386,6 +439,7 @@ canvas{display:block;width:100%;}
   <button class="nav-btn active" data-page="budget"><span class="nav-icon">&#128176;</span><span class="nav-lbl">Budget</span></button>
   <button class="nav-btn" data-page="bills"><span class="nav-icon">&#128197;</span><span class="nav-lbl">Pay Bills</span></button>
   <button class="nav-btn" data-page="subs"><span class="nav-icon" style="display:flex;align-items:center;justify-content:center;"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="20" height="20" rx="4" fill="white"/><polygon points="7,5 16,10 7,15" fill="#ff3b30"/></svg></span><span class="nav-lbl">Streams</span></button>
+  <button class="nav-btn" data-page="reserves"><span class="nav-icon">&#128023;</span><span class="nav-lbl">Reserves</span></button>
   <button class="nav-btn" data-page="expenses"><span class="nav-icon">&#128179;</span><span class="nav-lbl">Daily</span></button>
   <button class="nav-btn" data-page="stats"><span class="nav-icon">&#128202;</span><span class="nav-lbl">Stats</span></button>
 </nav>
@@ -398,7 +452,7 @@ var START_DATE = new Date('2026-06-05T00:00:00');
 var curPeriod = 0;
 var expCurPeriod = 0;
 var revealed = true;
-var categories = ['Housing','Transportation','Utilities','Food','Entertainment','Subscriptions','Debt Payoff','Other'];
+var categories = ['Housing','Transportation','Utilities','Food','Entertainment','Subscriptions','Debt Payoff','Goal Transfer','Other'];
 var bills = [
   {id:'fpl',      name:'FPL',                  amount:127.80, perPay:63.90,  cat:'Utilities',      type:'split', autoDay:null},
   {id:'prog',     name:'Progressive Insurance', amount:102.16, perPay:51.08,  cat:'Transportation', type:'split', autoDay:null},
@@ -414,7 +468,11 @@ var subscriptions = [];
 var billPay = {};
 var subPay = {};
 var expenses = []; // flat array [{id,name,merchant,amount,cat,date,dateISO}]
-var CAT_COLORS = {'Housing':'#7b8cff','Transportation':'#ffd166','Utilities':'#00e5a0','Food':'#ff6b6b','Entertainment':'#ff9ff3','Subscriptions':'#00d4aa','Debt Payoff':'#ff4757','Other':'#6b6b8a'};
+var reserves = [];
+// reserve: {id, name, type, targetAmt, savedAmt, perCheck, targetDate, cycle, subId, archived, history[]}
+// type: 'sub' | 'goal' | 'fund'
+
+var CAT_COLORS = {'Housing':'#7b8cff','Transportation':'#ffd166','Utilities':'#00e5a0','Food':'#ff6b6b','Entertainment':'#ff9ff3','Subscriptions':'#00d4aa','Debt Payoff':'#ff4757','Other':'#6b6b8a','Goal Transfer':'#7b8cff'};
 var MONTHS = ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
 var lastBackupDate = null;
@@ -502,7 +560,7 @@ function renderBackupStatus() {
 
 function save() {
   try {
-    localStorage.setItem('billit_v4', JSON.stringify({BUDGET:BUDGET,startDate:START_DATE.toISOString(),bills:bills,subscriptions:subscriptions,billPay:billPay,subPay:subPay,expenses:expenses,categories:categories}));
+    localStorage.setItem('billit_v4', JSON.stringify({BUDGET:BUDGET,startDate:START_DATE.toISOString(),bills:bills,subscriptions:subscriptions,billPay:billPay,subPay:subPay,expenses:expenses,categories:categories,reserves:reserves}));
   } catch(e) {}
 }
 
@@ -620,6 +678,8 @@ function getTotalPaid(pid) {
     if(e.type==='deposit') t-=e.amount;
     else t+=e.amount;
   });
+  // Add reserve per-check deductions
+  t+=getTotalReserveDeductions();
   return t;
 }
 
@@ -1385,7 +1445,7 @@ function deleteExp(id){
   toast('Removed');
 }
 
-var statsFilter='current';
+var statsFilter='overall';
 
 function setStatsFilter(f){
   statsFilter=f;
@@ -1622,9 +1682,384 @@ function exportStatsPdf(){
   setTimeout(function(){win.print();},500);
 }
 
+function onReserveTypeChange(){
+  var t=document.getElementById('nRType').value;
+  var dw=document.getElementById('nRDateWrap');
+  var mw=document.getElementById('nRPerCheckManualWrap');
+  if(dw)dw.style.display=t==='fund'?'none':'grid';
+  if(mw)mw.style.display=t==='fund'?'grid':'none';
+}
+
+function calcReservePerCheck(){
+  var target=parseFloat(document.getElementById('nRTarget').value)||0;
+  var dateVal=document.getElementById('nRDate').value;
+  var pcEl=document.getElementById('nRPerCheck');
+  if(!target||!dateVal){if(pcEl)pcEl.value='';return;}
+  var due=new Date(dateVal+'T00:00:00');
+  var now=new Date();
+  var periodsLeft=Math.max(1,Math.ceil((due-now)/(14*24*3600*1000)));
+  if(pcEl)pcEl.value=(target/periodsLeft).toFixed(2);
+}
+
+function getReservePerCheck(r){
+  if(r.perCheck)return r.perCheck;
+  if(!r.targetDate||!r.targetAmt)return 0;
+  var due=new Date(r.targetDate+'T00:00:00');
+  var now=new Date();
+  var periodsLeft=Math.max(1,Math.ceil((due-now)/(14*24*3600*1000)));
+  return +(r.targetAmt/periodsLeft).toFixed(2);
+}
+
+function getReservePctsLeft(r){
+  if(!r.targetDate)return null;
+  var due=new Date(r.targetDate+'T00:00:00');
+  var now=new Date();
+  return Math.max(0,Math.ceil((due-now)/(14*24*3600*1000)));
+}
+
+function getTotalReserveDeductions(){
+  return reserves.filter(function(r){return !r.archived;}).reduce(function(t,r){return t+getReservePerCheck(r);},0);
+}
+
+function renderReserves(){
+  var list=document.getElementById('reserveList');
+  var archList=document.getElementById('archivedList');
+  if(!list)return;
+  list.innerHTML='';
+  if(archList)archList.innerHTML='';
+
+  var active=reserves.filter(function(r){return !r.archived;});
+  var archived=reserves.filter(function(r){return r.archived;});
+
+  // Summary
+  var totalGoal=active.reduce(function(t,r){return t+(r.targetAmt||0);},0);
+  var totalSaved=active.reduce(function(t,r){return t+(r.savedAmt||0);},0);
+  var totalRemain=Math.max(0,totalGoal-totalSaved);
+  var elG=document.getElementById('rGoals');if(elG)elG.textContent=fm(totalGoal);
+  var elS=document.getElementById('rSaved');if(elS)elS.textContent=fm(totalSaved);
+  var elR=document.getElementById('rRemain');if(elR){elR.textContent=fm(totalRemain);elR.style.color=totalRemain<=0?'var(--accent)':'var(--accent2)';}
+  var sl=document.getElementById('reservesSummaryLine');
+  if(sl)sl.innerHTML=active.length+' goal'+(active.length!==1?'s':'')+' &nbsp;&middot;&nbsp; <span style="color:var(--accent)">'+fm(totalSaved)+'</span> saved';
+
+  if(!active.length){
+    list.innerHTML='<div class="empty">No goals yet.<br>Tap Add Goal to get started.</div>';
+  }
+
+  active.forEach(function(r){
+    var pc=getReservePerCheck(r);
+    var pLeft=getReservePctsLeft(r);
+    var pct=r.targetAmt>0?Math.min((r.savedAmt||0)/r.targetAmt*100,100):0;
+    var col=pct>=100?'var(--accent)':pct>50?'var(--accent3)':'var(--accent4)';
+
+    var row=document.createElement('div');
+    row.className='bill-row';
+    row.style.marginBottom='8px';
+
+    // Header
+    var hdr=document.createElement('div');hdr.className='br-hd';
+    var left=document.createElement('div');
+    var nameEl=document.createElement('div');nameEl.className='br-name';nameEl.textContent=r.name;
+    var metaEl=document.createElement('div');metaEl.className='br-meta';
+    var metaTxt=(r.type==='fund'?'Standing Fund':'Goal');
+    if(r.targetDate){var d=new Date(r.targetDate+'T00:00:00');metaTxt+=' &middot; Due '+d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});}
+    if(pLeft!==null)metaTxt+=' &middot; <span style="color:var(--accent4)">'+pLeft+' checks left</span>';
+    metaEl.innerHTML=metaTxt;
+    left.appendChild(nameEl);left.appendChild(metaEl);
+
+    var right=document.createElement('div');right.className='br-right';
+    var pctBadge=document.createElement('span');pctBadge.className='sub-badge';
+    pctBadge.style.cssText='background:rgba(123,140,255,0.12);color:var(--accent4);border:1px solid rgba(123,140,255,0.25);';
+    pctBadge.textContent=pct.toFixed(0)+'%';
+    var chevEl=document.createElement('span');chevEl.className='br-chev';chevEl.id='rChev_'+r.id;chevEl.innerHTML='&#9662;';
+    right.appendChild(pctBadge);right.appendChild(chevEl);
+    hdr.appendChild(left);hdr.appendChild(right);
+    row.appendChild(hdr);
+
+    // Body
+    var body=document.createElement('div');body.className='br-body';body.id='rbody_'+r.id;
+
+    // Progress bar
+    var progWrap=document.createElement('div');progWrap.className='prog-wrap';progWrap.style.margin='10px 0';
+    progWrap.innerHTML=
+      '<div class="prog-top"><span style="color:var(--muted)">'+fm(r.savedAmt||0)+' saved</span><span style="color:'+col+'">'+fm(r.targetAmt||0)+' goal</span></div>'+
+      '<div class="prog-bg"><div class="prog-fill" style="width:'+pct.toFixed(1)+'%;background:'+col+'"></div></div>'+
+      '<div class="prog-btm"><span style="color:var(--accent4)">'+fm(pc)+'/check</span><span style="color:var(--muted)">'+fm(Math.max(0,(r.targetAmt||0)-(r.savedAmt||0)))+' remaining</span></div>';
+    body.appendChild(progWrap);
+
+    // Action buttons
+    var actDiv=document.createElement('div');actDiv.style.cssText='display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;';
+    var addBtn=document.createElement('button');addBtn.className='btn btn-g btn-sm';addBtn.textContent='+ Add Funds';
+    var withdrawBtn=document.createElement('button');withdrawBtn.className='lnk-btn';withdrawBtn.style.color='var(--accent3)';withdrawBtn.textContent='Withdraw';
+    var transferBtn=document.createElement('button');transferBtn.className='lnk-btn';transferBtn.style.color='var(--accent4)';transferBtn.textContent='Transfer';
+    var editBtn=document.createElement('button');editBtn.className='lnk-btn';editBtn.textContent='edit';
+    var removeBtn=document.createElement('button');removeBtn.className='lnk-btn';removeBtn.style.color='var(--accent2)';removeBtn.textContent='remove';
+    actDiv.appendChild(addBtn);actDiv.appendChild(withdrawBtn);actDiv.appendChild(transferBtn);
+    actDiv.appendChild(editBtn);actDiv.appendChild(removeBtn);
+    body.appendChild(actDiv);
+
+    // Forms container
+    var formDiv=document.createElement('div');formDiv.id='rForm_'+r.id;
+    body.appendChild(formDiv);
+    row.appendChild(body);
+    list.appendChild(row);
+
+    (function(res,ab,wb,tb,eb,rb,fd,ch){
+      hdr.onclick=function(){var open=body.classList.toggle('open');ch.classList.toggle('open',open);};
+      ab.onclick=function(ev){ev.stopPropagation();showReserveAddFunds(res.id,fd);};
+      wb.onclick=function(ev){ev.stopPropagation();showReserveWithdraw(res.id,fd);};
+      tb.onclick=function(ev){ev.stopPropagation();showReserveTransfer(res.id,fd);};
+      eb.onclick=function(ev){ev.stopPropagation();showReserveEdit(res.id,fd);};
+      rb.onclick=function(ev){ev.stopPropagation();showReserveRemove(res.id,fd);};
+    })(r,addBtn,withdrawBtn,transferBtn,editBtn,removeBtn,formDiv,chevEl);
+  });
+
+  // Archived
+  if(archived.length&&archList){
+    archived.forEach(function(r){
+      var row=document.createElement('div');row.className='bill-row';row.style.cssText='margin-bottom:8px;opacity:0.6;';
+      var restoreBtn=document.createElement('button');restoreBtn.className='lnk-btn';restoreBtn.style.fontSize='10px';restoreBtn.textContent='Restore';
+      var hdrDiv=document.createElement('div');hdrDiv.className='br-hd';
+      var infoDiv=document.createElement('div');
+      var rName=document.createElement('div');rName.className='br-name';rName.textContent=r.name;
+      var rMeta=document.createElement('div');rMeta.className='br-meta';rMeta.textContent='Archived - '+fm(r.savedAmt||0)+' saved';
+      infoDiv.appendChild(rName);infoDiv.appendChild(rMeta);
+      hdrDiv.appendChild(infoDiv);hdrDiv.appendChild(restoreBtn);
+      row.appendChild(hdrDiv);
+      (function(rid,rb){rb.onclick=function(){restoreReserve(rid);};})(r.id,restoreBtn);
+      archList.appendChild(row);
+    });
+  } else if(archList){
+    archList.innerHTML='<div class="empty">No archived goals.</div>';
+  }
+
+  renderBudget();
+}
+
+function showReserveAddFunds(id,container){
+  if(container.innerHTML!==''){container.innerHTML='';return;}
+  container.innerHTML=
+    '<div class="edit-form" style="margin-top:10px;">'+
+      '<div class="ef-title">Add Funds</div>'+
+      '<div class="frow">'+
+        '<div class="fld"><label class="flbl">Amount ($)</label><input class="finp" id="rafAmt_'+id+'" type="number" step="0.01" placeholder="0.00" onkeyup="autoDecimal(this)"></div>'+
+        '<div class="fld"><label class="flbl">Note (optional)</label><input class="finp" id="rafNote_'+id+'" type="text" placeholder="e.g. check deposit"></div>'+
+      '</div>'+
+      '<div class="ef-btns">'+
+        '<button class="btn btn-g btn-sm" id="rafSave_'+id+'">Add</button>'+
+        '<button class="btn btn-sm" style="background:none;color:var(--muted);border:1px solid var(--border);" class="rCancel">Cancel</button>'+
+      '</div>'+
+    '</div>';
+  setTimeout(function(){
+    var b=document.getElementById('rafSave_'+id);
+    if(b)b.onclick=function(){addReserveFunds(id);};
+    var c=container.querySelector('.btn-sm:last-child');
+    if(c&&!c.id)c.onclick=function(){container.innerHTML='';};
+  },0);
+}
+
+function addReserveFunds(id){
+  var idx=reserves.findIndex(function(r){return r.id===id;});
+  if(idx<0)return;
+  var amt=parseFloat(document.getElementById('rafAmt_'+id).value)||0;
+  if(!amt){toast('Enter an amount');return;}
+  reserves[idx].savedAmt=(reserves[idx].savedAmt||0)+amt;
+  reserves[idx].history=reserves[idx].history||[];
+  reserves[idx].history.push({type:'add',amt:amt,date:fmtShort(new Date())});
+  save();renderReserves();toast(fm(amt)+' added to '+reserves[idx].name+'!');
+}
+
+function showReserveWithdraw(id,container){
+  var r=reserves.find(function(x){return x.id===id;});
+  if(!container||!r)return;
+  if(container.innerHTML!==''){container.innerHTML='';return;}
+  container.innerHTML=
+    '<div class="edit-form" style="margin-top:10px;">'+
+      '<div class="ef-title">Withdraw to Checking</div>'+
+      '<div class="frow full"><div class="fld"><label class="flbl">Amount ($) — Available: '+fm(r.savedAmt||0)+'</label><input class="finp" id="rwAmt_'+id+'" type="number" step="0.01" placeholder="0.00" onkeyup="autoDecimal(this)"></div></div>'+
+      '<div class="ef-btns">'+
+        '<button class="btn btn-g btn-sm" id="rwSave_'+id+'">Withdraw</button>'+
+        '<button class="btn btn-sm" style="background:none;color:var(--muted);border:1px solid var(--border);" class="rCancel">Cancel</button>'+
+      '</div>'+
+    '</div>';
+  setTimeout(function(){
+    var b=document.getElementById('rwSave_'+id);if(b)b.onclick=function(){withdrawReserve(id);};
+  },0);
+}
+
+function withdrawReserve(id){
+  var idx=reserves.findIndex(function(r){return r.id===id;});
+  if(idx<0)return;
+  var r=reserves[idx];
+  var amt=parseFloat(document.getElementById('rwAmt_'+id).value)||0;
+  if(!amt){toast('Enter an amount');return;}
+  if(amt>(r.savedAmt||0)){toast('Not enough saved');return;}
+  reserves[idx].savedAmt=(r.savedAmt||0)-amt;
+  reserves[idx].history=reserves[idx].history||[];
+  reserves[idx].history.push({type:'withdraw',amt:amt,date:fmtShort(new Date())});
+  // Log as deposit in Daily
+  var pid=nowPeriod();
+  if(!expenses[pid])expenses[pid]=[];
+  expenses[pid].push({id:uid(),name:'Goal Transfer - '+r.name,merchant:'Goal Transfer',amount:amt,cat:'Goal Transfer',date:fmtShort(new Date()),dateISO:fmtISO(new Date()),type:'deposit'});
+  save();renderReserves();renderExpenses();renderBudget();
+  toast(fm(amt)+' withdrawn and logged as deposit!');
+}
+
+function showReserveTransfer(id,container){
+  var others=reserves.filter(function(r){return r.id!==id&&!r.archived;});
+  if(!others.length){toast('No other goals to transfer to');return;}
+  if(container.innerHTML!==''){container.innerHTML='';return;}
+  var opts=others.map(function(r){return '<option value="'+r.id+'">'+r.name+'</option>';}).join('');
+  var src=reserves.find(function(r){return r.id===id;});
+  container.innerHTML=
+    '<div class="edit-form" style="margin-top:10px;">'+
+      '<div class="ef-title">Transfer to Another Goal</div>'+
+      '<div class="frow">'+
+        '<div class="fld"><label class="flbl">Amount ($) — Available: '+fm(src?src.savedAmt||0:0)+'</label><input class="finp" id="rtAmt_'+id+'" type="number" step="0.01" placeholder="0.00" onkeyup="autoDecimal(this)"></div>'+
+        '<div class="fld"><label class="flbl">To Goal</label><select class="fsel" id="rtDest_'+id+'">'+opts+'</select></div>'+
+      '</div>'+
+      '<div class="ef-btns">'+
+        '<button class="btn btn-g btn-sm" id="rtSave_'+id+'">Transfer</button>'+
+        '<button class="btn btn-sm" style="background:none;color:var(--muted);border:1px solid var(--border);" class="rCancel">Cancel</button>'+
+      '</div>'+
+    '</div>';
+  setTimeout(function(){
+    var b=document.getElementById('rtSave_'+id);if(b)b.onclick=function(){transferReserve(id);};
+  },0);
+}
+
+function transferReserve(srcId){
+  var srcIdx=reserves.findIndex(function(r){return r.id===srcId;});
+  if(srcIdx<0)return;
+  var amt=parseFloat(document.getElementById('rtAmt_'+srcId).value)||0;
+  var destId=document.getElementById('rtDest_'+srcId).value;
+  var destIdx=reserves.findIndex(function(r){return r.id===destId;});
+  if(!amt||destIdx<0){toast('Invalid transfer');return;}
+  if(amt>(reserves[srcIdx].savedAmt||0)){toast('Not enough saved');return;}
+  reserves[srcIdx].savedAmt=(reserves[srcIdx].savedAmt||0)-amt;
+  reserves[destIdx].savedAmt=(reserves[destIdx].savedAmt||0)+amt;
+  var srcName=reserves[srcIdx].name, destName=reserves[destIdx].name;
+  save();renderReserves();
+  toast(fm(amt)+' transferred from '+srcName+' to '+destName+'!');
+}
+
+function showReserveEdit(id,container){
+  var r=reserves.find(function(x){return x.id===id;});
+  if(!r||!container)return;
+  if(container.innerHTML!==''){container.innerHTML='';return;}
+  var form=document.createElement('div');form.className='edit-form';form.style.marginTop='10px';
+  var title=document.createElement('div');title.className='ef-title';title.textContent='Edit Goal';form.appendChild(title);
+  var r1=document.createElement('div');r1.className='frow';
+  var fN=document.createElement('div');fN.className='fld';
+  var lN=document.createElement('label');lN.className='flbl';lN.textContent='Goal Name';
+  var iN=document.createElement('input');iN.className='finp';iN.type='text';iN.id='reN_'+id;iN.value=r.name;
+  fN.appendChild(lN);fN.appendChild(iN);
+  var fT=document.createElement('div');fT.className='fld';
+  var lT=document.createElement('label');lT.className='flbl';lT.textContent='Target ($)';
+  var iT=document.createElement('input');iT.className='finp';iT.type='number';iT.step='0.01';iT.id='reT_'+id;iT.value=(r.targetAmt||0).toFixed(2);iT.onkeyup=function(){autoDecimal(this);};
+  fT.appendChild(lT);fT.appendChild(iT);
+  r1.appendChild(fN);r1.appendChild(fT);form.appendChild(r1);
+  var r2=document.createElement('div');r2.className='frow';
+  var fD=document.createElement('div');fD.className='fld';
+  var lD=document.createElement('label');lD.className='flbl';lD.textContent='Target Date';
+  var iD=document.createElement('input');iD.className='finp';iD.type='date';iD.id='reD_'+id;iD.value=r.targetDate||'';
+  fD.appendChild(lD);fD.appendChild(iD);
+  var fPC=document.createElement('div');fPC.className='fld';
+  var lPC=document.createElement('label');lPC.className='flbl';lPC.textContent='Per Check ($)';
+  var iPC=document.createElement('input');iPC.className='finp';iPC.type='number';iPC.step='0.01';iPC.id='rePC_'+id;iPC.value=(r.perCheck||0).toFixed(2);iPC.onkeyup=function(){autoDecimal(this);};
+  fPC.appendChild(lPC);fPC.appendChild(iPC);
+  r2.appendChild(fD);r2.appendChild(fPC);form.appendChild(r2);
+  var btns=document.createElement('div');btns.className='ef-btns';
+  var bS=document.createElement('button');bS.className='btn btn-g btn-sm';bS.textContent='Save';
+  bS.onclick=function(){saveReserveEdit(id,container);};
+  var bC=document.createElement('button');bC.className='btn btn-sm';bC.style.cssText='background:none;color:var(--muted);border:1px solid var(--border);';bC.textContent='Cancel';
+  bC.onclick=function(){container.innerHTML='';};
+  btns.appendChild(bS);btns.appendChild(bC);form.appendChild(btns);
+  container.appendChild(form);
+}
+
+function saveReserveEdit(id,container){
+  var idx=reserves.findIndex(function(r){return r.id===id;});
+  if(idx<0)return;
+  var name=document.getElementById('reN_'+id).value.trim();
+  var target=parseFloat(document.getElementById('reT_'+id).value)||0;
+  var date=document.getElementById('reD_'+id).value;
+  var pc=parseFloat(document.getElementById('rePC_'+id).value)||0;
+  if(!name){toast('Enter a name');return;}
+  reserves[idx].name=name;reserves[idx].targetAmt=target;
+  reserves[idx].targetDate=date||null;reserves[idx].perCheck=pc||null;
+  if(container)container.innerHTML='';
+  save();renderReserves();toast('Goal updated!');
+}
+
+function showReserveRemove(id,container){
+  var r=reserves.find(function(x){return x.id===id;});
+  if(!r||!container)return;
+  if(container.innerHTML!==''){container.innerHTML='';return;}
+  var others=reserves.filter(function(x){return x.id!==id&&!x.archived;});
+  var transferOpts=others.length?'<option value="transfer">Transfer to another goal</option>':'';
+  container.innerHTML=
+    '<div class="edit-form" style="margin-top:10px;border-color:var(--accent2);">'+
+      '<div class="ef-title" style="color:var(--accent2);">Remove Goal</div>'+
+      '<div style="font-size:11px;color:var(--muted);margin-bottom:10px;">'+fm(r.savedAmt||0)+' is saved in this goal. What would you like to do with it?</div>'+
+      '<div class="frow full"><div class="fld"><label class="flbl">Saved Balance</label>'+
+        '<select class="fsel" id="rrAction_'+id+'">'+
+          transferOpts+
+          '<option value="deposit">Return to checking (log as deposit)</option>'+
+          '<option value="archive">Archive goal (keep history)</option>'+
+          '<option value="delete">Delete permanently</option>'+
+        '</select></div></div>'+
+      (others.length?'<div class="frow full" id="rrTransferDest_'+id+'"><div class="fld"><label class="flbl">Transfer To</label><select class="fsel" id="rrDest_'+id+'">'+others.map(function(x){return '<option value="'+x.id+'">'+x.name+'</option>';}).join('')+'</select></div></div>':'') +
+      '<div class="ef-btns">'+
+        '<button class="btn btn-r btn-sm" id="rrSave_'+id+'">Confirm Remove</button>'+
+        '<button class="btn btn-sm" style="background:none;color:var(--muted);border:1px solid var(--border);" class="rCancel">Cancel</button>'+
+      '</div>'+
+    '</div>';
+  setTimeout(function(){
+    var b=document.getElementById('rrSave_'+id);if(b)b.onclick=function(){confirmRemoveReserve(id);};
+  },0);
+}
+
+function confirmRemoveReserve(id){
+  var idx=reserves.findIndex(function(r){return r.id===id;});
+  if(idx<0)return;
+  var r=reserves[idx];
+  var action=document.getElementById('rrAction_'+id).value;
+  var saved=r.savedAmt||0;
+  if(action==='transfer'){
+    var destId=document.getElementById('rrDest_'+id)?document.getElementById('rrDest_'+id).value:null;
+    var destIdx=destId?reserves.findIndex(function(x){return x.id===destId;}):-1;
+    if(destIdx>=0&&saved>0)reserves[destIdx].savedAmt=(reserves[destIdx].savedAmt||0)+saved;
+    reserves.splice(idx,1);
+    toast('Goal removed, funds transferred!');
+  } else if(action==='deposit'){
+    if(saved>0){
+      var pid=nowPeriod();
+      if(!expenses[pid])expenses[pid]=[];
+      expenses[pid].push({id:uid(),name:'Goal Transfer - '+r.name,merchant:'Goal Transfer',amount:saved,cat:'Goal Transfer',date:fmtShort(new Date()),dateISO:fmtISO(new Date()),type:'deposit'});
+    }
+    reserves.splice(idx,1);
+    toast('Goal removed, '+fm(saved)+' returned to checking!');
+  } else if(action==='archive'){
+    reserves[idx].archived=true;
+    toast('Goal archived');
+  } else {
+    reserves.splice(idx,1);
+    toast('Goal deleted');
+  }
+  save();renderReserves();renderExpenses();renderBudget();
+}
+
+function restoreReserve(id){
+  var idx=reserves.findIndex(function(r){return r.id===id;});
+  if(idx<0)return;
+  reserves[idx].archived=false;
+  save();renderReserves();toast('Goal restored!');
+}
+
 function fullRender(){
   curPeriod=nowPeriod();
   expCurPeriod=nowPeriod();
+  renderReserves();
   populateCatSelects();
   renderBudget();renderBills();renderSubs();renderExpenses();renderStats();renderCatList();
 }
@@ -1733,6 +2168,28 @@ document.addEventListener('change', function(ev){
   }
 });
 
+document.getElementById('addReserveHd').addEventListener('click',function(){
+  var b=document.getElementById('addReserveBd');var o=b.classList.toggle('open');
+  document.getElementById('addReserveHnt').textContent=o?'tap to close':'tap to add';
+});
+
+document.getElementById('addReserveBtn').addEventListener('click',function(){
+  var name=document.getElementById('nRName').value.trim();
+  var type=document.getElementById('nRType').value;
+  var target=parseFloat(document.getElementById('nRTarget').value)||0;
+  var dateVal=document.getElementById('nRDate').value;
+  var pc=type==='fund'?parseFloat(document.getElementById('nRPerCheckManual').value)||0:parseFloat(document.getElementById('nRPerCheck').value)||0;
+  if(!name){toast('Enter a goal name');return;}
+  if(!target&&type!=='fund'){toast('Enter a target amount');return;}
+  if(!pc&&type==='fund'){toast('Enter a per check amount');return;}
+  reserves.push({id:uid(),name:name,type:type,targetAmt:target||0,savedAmt:0,perCheck:pc||null,targetDate:dateVal||null,archived:false,history:[]});
+  document.getElementById('nRName').value='';document.getElementById('nRTarget').value='';
+  document.getElementById('nRDate').value='';document.getElementById('nRPerCheck').value='';
+  document.getElementById('addReserveBd').classList.remove('open');
+  document.getElementById('addReserveHnt').textContent='tap to add';
+  save();renderReserves();toast(name+' goal added!');
+});
+
 document.getElementById('saveSettings').addEventListener('click',function(){
   BUDGET=parseFloat(document.getElementById('setBudget').value)||1710.33;
   var dv=document.getElementById('setStart').value;if(dv)START_DATE=new Date(dv+'T00:00:00');
@@ -1745,6 +2202,13 @@ document.getElementById('bPrev').addEventListener('click',function(){if(curPerio
 document.getElementById('bNext').addEventListener('click',function(){curPeriod++;renderBills();});
 document.getElementById('ePrev').addEventListener('click',function(){if(expCurPeriod>0){expCurPeriod--;renderExpenses();}});
 document.getElementById('eNext').addEventListener('click',function(){expCurPeriod++;renderExpenses();});
+
+document.addEventListener('click', function(ev){
+  if(ev.target && ev.target.classList.contains('rCancel')){
+    var form=ev.target.closest('.edit-form');
+    if(form&&form.parentElement)form.parentElement.innerHTML='';
+  }
+});
 
 load();
 fullRender();
