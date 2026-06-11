@@ -1861,33 +1861,50 @@ function contributeReserve(id){
 }
 
 function showReserveAddFunds(id,container){
-  if(container.innerHTML!==''){container.innerHTML='';return;}
-  container.innerHTML=
-    '<div class="edit-form" style="margin-top:10px;">'+
-      '<div class="ef-title">Add Funds</div>'+
-      '<div class="frow">'+
-        '<div class="fld"><label class="flbl">Amount ($)</label><input class="finp" id="rafAmt_'+id+'" type="number" step="0.01" placeholder="0.00" onkeyup="autoDecimal(this)"></div>'+
-        '<div class="fld"><label class="flbl">Source</label>'+
-          '<select class="fsel" id="rafSrc_'+id+'">'+
-            '<option value="checking">From checking (deducts budget)</option>'+
-            '<option value="savings">Already in savings (no budget impact)</option>'+
-          '</select>'+
-        '</div>'+
-      '</div>'+
-      '<div class="frow full">'+
-        '<div class="fld"><label class="flbl">Note (optional)</label><input class="finp" id="rafNote_'+id+'" type="text" placeholder="e.g. extra contribution"></div>'+
-      '</div>'+
-      '<div class="ef-btns">'+
-        '<button class="btn btn-g btn-sm" id="rafSave_'+id+'">Add</button>'+
-        '<button class="btn btn-sm rCancel" style="background:none;color:var(--muted);border:1px solid var(--border);">Cancel</button>'+
-      '</div>'+
-    '</div>';
-  setTimeout(function(){
-    var b=document.getElementById('rafSave_'+id);
-    if(b)b.onclick=function(){addReserveFunds(id);};
-    var c=container.querySelector('.btn-sm:last-child');
-    if(c&&!c.id)c.onclick=function(){container.innerHTML='';};
-  },0);
+  if(!container)return;
+  if(container.children.length>0){container.innerHTML='';return;}
+  var wrap=document.createElement('div');wrap.className='edit-form';wrap.style.marginTop='10px';
+  var ttl=document.createElement('div');ttl.className='ef-title';ttl.textContent='Add Funds';wrap.appendChild(ttl);
+  var row1=document.createElement('div');row1.className='frow';
+  var fAmt=document.createElement('div');fAmt.className='fld';
+  var lAmt=document.createElement('label');lAmt.className='flbl';lAmt.textContent='Amount ($)';
+  var iAmt=document.createElement('input');iAmt.className='finp';iAmt.type='number';iAmt.step='0.01';iAmt.placeholder='0.00';iAmt.onkeyup=function(){autoDecimal(this);};
+  fAmt.appendChild(lAmt);fAmt.appendChild(iAmt);
+  var fSrc=document.createElement('div');fSrc.className='fld';
+  var lSrc=document.createElement('label');lSrc.className='flbl';lSrc.textContent='Source';
+  var sSrc=document.createElement('select');sSrc.className='fsel';
+  [{v:'checking',l:'From checking (deducts budget)'},{v:'savings',l:'Already in savings (no budget impact)'}].forEach(function(o){var opt=document.createElement('option');opt.value=o.v;opt.textContent=o.l;sSrc.appendChild(opt);});
+  fSrc.appendChild(lSrc);fSrc.appendChild(sSrc);
+  row1.appendChild(fAmt);row1.appendChild(fSrc);wrap.appendChild(row1);
+  var row2=document.createElement('div');row2.className='frow full';
+  var fNote=document.createElement('div');fNote.className='fld';
+  var lNote=document.createElement('label');lNote.className='flbl';lNote.textContent='Note (optional)';
+  var iNote=document.createElement('input');iNote.className='finp';iNote.type='text';iNote.placeholder='e.g. extra contribution';
+  fNote.appendChild(lNote);fNote.appendChild(iNote);
+  row2.appendChild(fNote);wrap.appendChild(row2);
+  var btns=document.createElement('div');btns.className='ef-btns';
+  var bSave=document.createElement('button');bSave.className='btn btn-g btn-sm';bSave.textContent='Add';
+  var bCancel=document.createElement('button');bCancel.className='btn btn-sm';bCancel.style.cssText='background:none;color:var(--muted);border:1px solid var(--border);';bCancel.textContent='Cancel';
+  bSave.onclick=function(){
+    var amt=parseFloat(iAmt.value)||0;
+    var src=sSrc.value;
+    var note=iNote.value.trim();
+    if(!amt){toast('Enter an amount');return;}
+    var idx=reserves.findIndex(function(r){return r.id===id;});
+    if(idx<0)return;
+    reserves[idx].savedAmt=(reserves[idx].savedAmt||0)+amt;
+    reserves[idx].history=reserves[idx].history||[];
+    reserves[idx].history.push({type:'add',src:src,amt:amt,date:fmtShort(new Date()),note:note});
+    if(src==='checking'){
+      var pid=nowPeriod();if(!expenses[pid])expenses[pid]=[];
+      expenses[pid].push({id:uid(),name:'Goal Transfer - '+reserves[idx].name,merchant:'Goal Transfer',amount:amt,cat:'Goal Transfer',date:fmtShort(new Date()),dateISO:fmtISO(new Date()),type:'expense'});
+    }
+    save();renderReserves();renderBudget();if(src==='checking')renderExpenses();
+    toast(fm(amt)+' added to '+reserves[idx].name+(src==='checking'?' (deducted from budget)':'')+'!');
+  };
+  bCancel.onclick=function(){container.innerHTML='';};
+  btns.appendChild(bSave);btns.appendChild(bCancel);wrap.appendChild(btns);
+  container.appendChild(wrap);
 }
 
 function addReserveFunds(id){
