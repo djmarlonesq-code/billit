@@ -355,6 +355,9 @@ canvas{display:block;width:100%;}
       <div class="frow" id="nRPerCheckManualWrap" style="display:none">
         <div class="fld"><label class="flbl">Per Check ($)</label><input class="finp" id="nRPerCheckManual" type="number" step="0.01" placeholder="0.00" onkeyup="autoDecimal(this)"></div>
       </div>
+      <div class="frow">
+        <div class="fld"><label class="flbl">Already Saved ($) — optional</label><input class="finp" id="nRSaved" type="number" step="0.01" placeholder="0.00 — won't affect budget" onkeyup="autoDecimal(this)"></div>
+      </div>
       <button class="btn btn-g" id="addReserveBtn">+ Add Goal</button>
     </div>
   </div>
@@ -439,7 +442,7 @@ canvas{display:block;width:100%;}
   <button class="nav-btn active" data-page="budget"><span class="nav-icon">&#128176;</span><span class="nav-lbl">Budget</span></button>
   <button class="nav-btn" data-page="bills"><span class="nav-icon">&#128197;</span><span class="nav-lbl">Pay Bills</span></button>
   <button class="nav-btn" data-page="subs"><span class="nav-icon" style="display:flex;align-items:center;justify-content:center;"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="20" height="20" rx="4" fill="white"/><polygon points="7,5 16,10 7,15" fill="#ff3b30"/></svg></span><span class="nav-lbl">Streams</span></button>
-  <button class="nav-btn" data-page="reserves"><span class="nav-icon">&#128023;</span><span class="nav-lbl">Reserves</span></button>
+  <button class="nav-btn" data-page="reserves"><span class="nav-icon">&#127919;</span><span class="nav-lbl">Reserves</span></button>
   <button class="nav-btn" data-page="expenses"><span class="nav-icon">&#128179;</span><span class="nav-lbl">Daily</span></button>
   <button class="nav-btn" data-page="stats"><span class="nav-icon">&#128202;</span><span class="nav-lbl">Stats</span></button>
 </nav>
@@ -1842,7 +1845,15 @@ function showReserveAddFunds(id,container){
       '<div class="ef-title">Add Funds</div>'+
       '<div class="frow">'+
         '<div class="fld"><label class="flbl">Amount ($)</label><input class="finp" id="rafAmt_'+id+'" type="number" step="0.01" placeholder="0.00" onkeyup="autoDecimal(this)"></div>'+
-        '<div class="fld"><label class="flbl">Note (optional)</label><input class="finp" id="rafNote_'+id+'" type="text" placeholder="e.g. check deposit"></div>'+
+        '<div class="fld"><label class="flbl">Source</label>'+
+          '<select class="fsel" id="rafSrc_'+id+'">'+
+            '<option value="checking">From checking (deducts budget)</option>'+
+            '<option value="savings">Already in savings (no budget impact)</option>'+
+          '</select>'+
+        '</div>'+
+      '</div>'+
+      '<div class="frow full">'+
+        '<div class="fld"><label class="flbl">Note (optional)</label><input class="finp" id="rafNote_'+id+'" type="text" placeholder="e.g. extra contribution"></div>'+
       '</div>'+
       '<div class="ef-btns">'+
         '<button class="btn btn-g btn-sm" id="rafSave_'+id+'">Add</button>'+
@@ -1861,11 +1872,20 @@ function addReserveFunds(id){
   var idx=reserves.findIndex(function(r){return r.id===id;});
   if(idx<0)return;
   var amt=parseFloat(document.getElementById('rafAmt_'+id).value)||0;
+  var src=document.getElementById('rafSrc_'+id).value;
+  var note=document.getElementById('rafNote_'+id).value.trim();
   if(!amt){toast('Enter an amount');return;}
   reserves[idx].savedAmt=(reserves[idx].savedAmt||0)+amt;
   reserves[idx].history=reserves[idx].history||[];
-  reserves[idx].history.push({type:'add',amt:amt,date:fmtShort(new Date())});
-  save();renderReserves();toast(fm(amt)+' added to '+reserves[idx].name+'!');
+  reserves[idx].history.push({type:'add',src:src,amt:amt,date:fmtShort(new Date()),note:note});
+  // If from checking - log as expense in Daily
+  if(src==='checking'){
+    var pid=nowPeriod();
+    if(!expenses[pid])expenses[pid]=[];
+    expenses[pid].push({id:uid(),name:'Goal Transfer - '+reserves[idx].name,merchant:'Goal Transfer',amount:amt,cat:'Goal Transfer',date:fmtShort(new Date()),dateISO:fmtISO(new Date()),type:'expense'});
+  }
+  save();renderReserves();renderBudget();if(src==='checking')renderExpenses();
+  toast(fm(amt)+' added to '+reserves[idx].name+(src==='checking'?' (deducted from budget)':'')+'!');
 }
 
 function showReserveWithdraw(id,container){
@@ -2182,9 +2202,11 @@ document.getElementById('addReserveBtn').addEventListener('click',function(){
   if(!name){toast('Enter a goal name');return;}
   if(!target&&type!=='fund'){toast('Enter a target amount');return;}
   if(!pc&&type==='fund'){toast('Enter a per check amount');return;}
-  reserves.push({id:uid(),name:name,type:type,targetAmt:target||0,savedAmt:0,perCheck:pc||null,targetDate:dateVal||null,archived:false,history:[]});
+  var alreadySaved=parseFloat(document.getElementById('nRSaved').value)||0;
+  reserves.push({id:uid(),name:name,type:type,targetAmt:target||0,savedAmt:alreadySaved,perCheck:pc||null,targetDate:dateVal||null,archived:false,history:alreadySaved>0?[{type:'starting',amt:alreadySaved,date:fmtShort(new Date()),note:'Starting balance'}]:[]});
   document.getElementById('nRName').value='';document.getElementById('nRTarget').value='';
   document.getElementById('nRDate').value='';document.getElementById('nRPerCheck').value='';
+  document.getElementById('nRSaved').value='';
   document.getElementById('addReserveBd').classList.remove('open');
   document.getElementById('addReserveHnt').textContent='tap to add';
   save();renderReserves();toast(name+' goal added!');
