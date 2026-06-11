@@ -1930,19 +1930,33 @@ function addReserveFunds(id){
 function showReserveWithdraw(id,container){
   var r=reserves.find(function(x){return x.id===id;});
   if(!container||!r)return;
-  if(container.innerHTML!==''){container.innerHTML='';return;}
-  container.innerHTML=
-    '<div class="edit-form" style="margin-top:10px;">'+
-      '<div class="ef-title">Withdraw to Checking</div>'+
-      '<div class="frow full"><div class="fld"><label class="flbl">Amount ($) — Available: '+fm(r.savedAmt||0)+'</label><input class="finp" id="rwAmt_'+id+'" type="number" step="0.01" placeholder="0.00" onkeyup="autoDecimal(this)"></div></div>'+
-      '<div class="ef-btns">'+
-        '<button class="btn btn-g btn-sm" id="rwSave_'+id+'">Withdraw</button>'+
-        '<button class="btn btn-sm rCancel" style="background:none;color:var(--muted);border:1px solid var(--border);">Cancel</button>'+
-      '</div>'+
-    '</div>';
-  setTimeout(function(){
-    var b=document.getElementById('rwSave_'+id);if(b)b.onclick=function(){withdrawReserve(id);};
-  },0);
+  if(container.children.length>0){container.innerHTML='';return;}
+  var wrap=document.createElement('div');wrap.className='edit-form';wrap.style.marginTop='10px';
+  var ttl=document.createElement('div');ttl.className='ef-title';ttl.textContent='Withdraw to Checking';wrap.appendChild(ttl);
+  var row=document.createElement('div');row.className='frow full';
+  var fld=document.createElement('div');fld.className='fld';
+  var lbl=document.createElement('label');lbl.className='flbl';lbl.textContent='Amount ($) — Available: '+fm(r.savedAmt||0);
+  var inp=document.createElement('input');inp.className='finp';inp.type='number';inp.step='0.01';inp.placeholder='0.00';inp.onkeyup=function(){autoDecimal(this);};
+  fld.appendChild(lbl);fld.appendChild(inp);row.appendChild(fld);wrap.appendChild(row);
+  var btns=document.createElement('div');btns.className='ef-btns';
+  var bSave=document.createElement('button');bSave.className='btn btn-g btn-sm';bSave.textContent='Withdraw';
+  var bCancel=document.createElement('button');bCancel.className='btn btn-sm';bCancel.style.cssText='background:none;color:var(--muted);border:1px solid var(--border);';bCancel.textContent='Cancel';
+  bSave.onclick=function(){
+    var amt=parseFloat(inp.value)||0;
+    if(!amt){toast('Enter an amount');return;}
+    if(amt>( r.savedAmt||0)){toast('Not enough saved');return;}
+    var idx=reserves.findIndex(function(x){return x.id===id;});if(idx<0)return;
+    reserves[idx].savedAmt=(r.savedAmt||0)-amt;
+    reserves[idx].history=reserves[idx].history||[];
+    reserves[idx].history.push({type:'withdraw',amt:amt,date:fmtShort(new Date())});
+    var pid=nowPeriod();if(!expenses[pid])expenses[pid]=[];
+    expenses[pid].push({id:uid(),name:'Goal Transfer - '+r.name,merchant:'Goal Transfer',amount:amt,cat:'Goal Transfer',date:fmtShort(new Date()),dateISO:fmtISO(new Date()),type:'deposit'});
+    save();renderReserves();renderExpenses();renderBudget();
+    toast(fm(amt)+' withdrawn and logged as deposit!');
+  };
+  bCancel.onclick=function(){container.innerHTML='';};
+  btns.appendChild(bSave);btns.appendChild(bCancel);wrap.appendChild(btns);
+  container.appendChild(wrap);
 }
 
 function withdrawReserve(id){
@@ -1966,24 +1980,39 @@ function withdrawReserve(id){
 function showReserveTransfer(id,container){
   var others=reserves.filter(function(r){return r.id!==id&&!r.archived;});
   if(!others.length){toast('No other goals to transfer to');return;}
-  if(container.innerHTML!==''){container.innerHTML='';return;}
-  var opts=others.map(function(r){return '<option value="'+r.id+'">'+r.name+'</option>';}).join('');
+  if(!container)return;
+  if(container.children.length>0){container.innerHTML='';return;}
   var src=reserves.find(function(r){return r.id===id;});
-  container.innerHTML=
-    '<div class="edit-form" style="margin-top:10px;">'+
-      '<div class="ef-title">Transfer to Another Goal</div>'+
-      '<div class="frow">'+
-        '<div class="fld"><label class="flbl">Amount ($) — Available: '+fm(src?src.savedAmt||0:0)+'</label><input class="finp" id="rtAmt_'+id+'" type="number" step="0.01" placeholder="0.00" onkeyup="autoDecimal(this)"></div>'+
-        '<div class="fld"><label class="flbl">To Goal</label><select class="fsel" id="rtDest_'+id+'">'+opts+'</select></div>'+
-      '</div>'+
-      '<div class="ef-btns">'+
-        '<button class="btn btn-g btn-sm" id="rtSave_'+id+'">Transfer</button>'+
-        '<button class="btn btn-sm rCancel" style="background:none;color:var(--muted);border:1px solid var(--border);">Cancel</button>'+
-      '</div>'+
-    '</div>';
-  setTimeout(function(){
-    var b=document.getElementById('rtSave_'+id);if(b)b.onclick=function(){transferReserve(id);};
-  },0);
+  var wrap=document.createElement('div');wrap.className='edit-form';wrap.style.marginTop='10px';
+  var ttl=document.createElement('div');ttl.className='ef-title';ttl.textContent='Transfer to Another Goal';wrap.appendChild(ttl);
+  var row=document.createElement('div');row.className='frow';
+  var fAmt=document.createElement('div');fAmt.className='fld';
+  var lAmt=document.createElement('label');lAmt.className='flbl';lAmt.textContent='Amount ($) — Available: '+fm(src?src.savedAmt||0:0);
+  var iAmt=document.createElement('input');iAmt.className='finp';iAmt.type='number';iAmt.step='0.01';iAmt.placeholder='0.00';iAmt.onkeyup=function(){autoDecimal(this);};
+  fAmt.appendChild(lAmt);fAmt.appendChild(iAmt);
+  var fDest=document.createElement('div');fDest.className='fld';
+  var lDest=document.createElement('label');lDest.className='flbl';lDest.textContent='To Goal';
+  var sDest=document.createElement('select');sDest.className='fsel';
+  others.forEach(function(r){var o=document.createElement('option');o.value=r.id;o.textContent=r.name;sDest.appendChild(o);});
+  fDest.appendChild(lDest);fDest.appendChild(sDest);
+  row.appendChild(fAmt);row.appendChild(fDest);wrap.appendChild(row);
+  var btns=document.createElement('div');btns.className='ef-btns';
+  var bSave=document.createElement('button');bSave.className='btn btn-g btn-sm';bSave.textContent='Transfer';
+  var bCancel=document.createElement('button');bCancel.className='btn btn-sm';bCancel.style.cssText='background:none;color:var(--muted);border:1px solid var(--border);';bCancel.textContent='Cancel';
+  bSave.onclick=function(){
+    var amt=parseFloat(iAmt.value)||0;var destId=sDest.value;
+    if(!amt){toast('Enter an amount');return;}
+    var srcIdx=reserves.findIndex(function(r){return r.id===id;});
+    var destIdx=reserves.findIndex(function(r){return r.id===destId;});
+    if(srcIdx<0||destIdx<0){toast('Invalid transfer');return;}
+    if(amt>(reserves[srcIdx].savedAmt||0)){toast('Not enough saved');return;}
+    reserves[srcIdx].savedAmt=(reserves[srcIdx].savedAmt||0)-amt;
+    reserves[destIdx].savedAmt=(reserves[destIdx].savedAmt||0)+amt;
+    save();renderReserves();toast(fm(amt)+' transferred to '+reserves[destIdx].name+'!');
+  };
+  bCancel.onclick=function(){container.innerHTML='';};
+  btns.appendChild(bSave);btns.appendChild(bCancel);wrap.appendChild(btns);
+  container.appendChild(wrap);
 }
 
 function transferReserve(srcId){
@@ -2090,11 +2119,12 @@ function showReserveRemove(id,container){
       (others.length?'<div class="frow full" id="rrTransferDest_'+id+'"><div class="fld"><label class="flbl">Transfer To</label><select class="fsel" id="rrDest_'+id+'">'+others.map(function(x){return '<option value="'+x.id+'">'+x.name+'</option>';}).join('')+'</select></div></div>':'') +
       '<div class="ef-btns">'+
         '<button class="btn btn-r btn-sm" id="rrSave_'+id+'">Confirm Remove</button>'+
-        '<button class="btn btn-sm rCancel" style="background:none;color:var(--muted);border:1px solid var(--border);">Cancel</button>'+
+        '<button class="btn btn-sm" id="rrCancel_'+id+'" style="background:none;color:var(--muted);border:1px solid var(--border);">Cancel</button>'+
       '</div>'+
     '</div>';
   setTimeout(function(){
     var b=document.getElementById('rrSave_'+id);if(b)b.onclick=function(){confirmRemoveReserve(id);};
+    var c=document.getElementById('rrCancel_'+id);if(c)c.onclick=function(){var container=document.getElementById('rForm_'+id);if(container)container.innerHTML='';};
   },0);
 }
 
@@ -2284,14 +2314,7 @@ document.getElementById('bNext').addEventListener('click',function(){curPeriod++
 document.getElementById('ePrev').addEventListener('click',function(){if(expCurPeriod>0){expCurPeriod--;renderExpenses();}});
 document.getElementById('eNext').addEventListener('click',function(){expCurPeriod++;renderExpenses();});
 
-document.addEventListener('click', function(ev){
-  var el=ev.target;
-  if(el && el.classList && el.classList.contains('rCancel')){
-    ev.stopPropagation();
-    var container=el.closest('[id^="rForm_"]')||el.closest('[id^="editSubForm_"]')||el.closest('[id^="editBillForm_"]')||el.closest('[id^="editEForm_"]');
-    if(container)container.innerHTML='';
-  }
-});
+
 
 load();
 fullRender();
