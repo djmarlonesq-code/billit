@@ -1854,8 +1854,7 @@ function contributeReserve(id){
   reserves[idx].history.push({type:'contribute',amt:pc,date:fmtShort(new Date()),note:'Per-check contribution'});
   // Deduct from budget - log as expense in Daily
   var pid=nowPeriod();
-  if(!expenses[pid])expenses[pid]=[];
-  expenses[pid].push({id:uid(),name:'Goal Transfer - '+r.name,merchant:'Goal Transfer',amount:pc,cat:'Goal Transfer',date:fmtShort(new Date()),dateISO:fmtISO(new Date()),type:'expense'});
+  expenses.push({id:uid(),name:'Goal Transfer - '+r.name,merchant:'Goal Transfer',amount:pc,cat:'Goal Transfer',date:fmtShort(new Date()),dateISO:fmtISO(new Date()),type:'expense'});
   save();renderReserves();renderBudget();renderExpenses();
   toast(fm(pc)+' contributed to '+r.name+'!');
 }
@@ -1868,7 +1867,7 @@ function showReserveAddFunds(id,container){
   var row1=document.createElement('div');row1.className='frow';
   var fAmt=document.createElement('div');fAmt.className='fld';
   var lAmt=document.createElement('label');lAmt.className='flbl';lAmt.textContent='Amount ($)';
-  var iAmt=document.createElement('input');iAmt.className='finp';iAmt.type='number';iAmt.step='0.01';iAmt.placeholder='0.00';iAmt.onkeyup=function(){autoDecimal(this);};
+  var iAmt=document.createElement('input');iAmt.className='finp';iAmt.type='number';iAmt.step='0.01';iAmt.placeholder='0.00';
   fAmt.appendChild(lAmt);fAmt.appendChild(iAmt);
   var fSrc=document.createElement('div');fSrc.className='fld';
   var lSrc=document.createElement('label');lSrc.className='flbl';lSrc.textContent='Source';
@@ -1886,21 +1885,22 @@ function showReserveAddFunds(id,container){
   var bSave=document.createElement('button');bSave.className='btn btn-g btn-sm';bSave.textContent='Add';
   var bCancel=document.createElement('button');bCancel.className='btn btn-sm';bCancel.style.cssText='background:none;color:var(--muted);border:1px solid var(--border);';bCancel.textContent='Cancel';
   bSave.onclick=function(){
-    var amt=parseFloat(iAmt.value)||0;
-    var src=sSrc.value;
-    var note=iNote.value.trim();
-    if(!amt){toast('Enter an amount');return;}
-    var idx=reserves.findIndex(function(r){return r.id===id;});
-    if(idx<0)return;
-    reserves[idx].savedAmt=(reserves[idx].savedAmt||0)+amt;
-    reserves[idx].history=reserves[idx].history||[];
-    reserves[idx].history.push({type:'add',src:src,amt:amt,date:fmtShort(new Date()),note:note});
-    if(src==='checking'){
-      var pid=nowPeriod();if(!expenses[pid])expenses[pid]=[];
-      expenses[pid].push({id:uid(),name:'Goal Transfer - '+reserves[idx].name,merchant:'Goal Transfer',amount:amt,cat:'Goal Transfer',date:fmtShort(new Date()),dateISO:fmtISO(new Date()),type:'expense'});
-    }
-    save();renderReserves();renderBudget();if(src==='checking')renderExpenses();
-    toast(fm(amt)+' added to '+reserves[idx].name+(src==='checking'?' (deducted from budget)':'')+'!');
+    try{
+      var amt=parseFloat(iAmt.value)||0;
+      var src=sSrc.value;
+      var note=iNote.value.trim();
+      if(!amt){toast('Enter an amount');return;}
+      var idx=reserves.findIndex(function(r){return r.id===id;});
+      if(idx<0){toast('Goal not found: '+id);return;}
+      reserves[idx].savedAmt=(reserves[idx].savedAmt||0)+amt;
+      reserves[idx].history=reserves[idx].history||[];
+      reserves[idx].history.push({type:'add',src:src,amt:amt,date:fmtShort(new Date()),note:note});
+      if(src==='checking'){
+        expenses.push({id:uid(),name:'Goal Transfer - '+reserves[idx].name,merchant:'Goal Transfer',amount:amt,cat:'Goal Transfer',date:fmtShort(new Date()),dateISO:fmtISO(new Date()),type:'expense'});
+      }
+      save();renderReserves();renderBudget();if(src==='checking')renderExpenses();
+      toast(fm(amt)+' added to '+reserves[idx].name+(src==='checking'?' (deducted from budget)':'')+'!');
+    }catch(e){toast('Error: '+e.message);}
   };
   bCancel.onclick=function(){container.innerHTML='';};
   btns.appendChild(bSave);btns.appendChild(bCancel);wrap.appendChild(btns);
@@ -1920,8 +1920,7 @@ function addReserveFunds(id){
   // If from checking - log as expense in Daily
   if(src==='checking'){
     var pid=nowPeriod();
-    if(!expenses[pid])expenses[pid]=[];
-    expenses[pid].push({id:uid(),name:'Goal Transfer - '+reserves[idx].name,merchant:'Goal Transfer',amount:amt,cat:'Goal Transfer',date:fmtShort(new Date()),dateISO:fmtISO(new Date()),type:'expense'});
+    expenses.push({id:uid(),name:'Goal Transfer - '+reserves[idx].name,merchant:'Goal Transfer',amount:amt,cat:'Goal Transfer',date:fmtShort(new Date()),dateISO:fmtISO(new Date()),type:'expense'});
   }
   save();renderReserves();renderBudget();if(src==='checking')renderExpenses();
   toast(fm(amt)+' added to '+reserves[idx].name+(src==='checking'?' (deducted from budget)':'')+'!');
@@ -1949,8 +1948,7 @@ function showReserveWithdraw(id,container){
     reserves[idx].savedAmt=(r.savedAmt||0)-amt;
     reserves[idx].history=reserves[idx].history||[];
     reserves[idx].history.push({type:'withdraw',amt:amt,date:fmtShort(new Date())});
-    var pid=nowPeriod();if(!expenses[pid])expenses[pid]=[];
-    expenses[pid].push({id:uid(),name:'Goal Transfer - '+r.name,merchant:'Goal Transfer',amount:amt,cat:'Goal Transfer',date:fmtShort(new Date()),dateISO:fmtISO(new Date()),type:'deposit'});
+    expenses.push({id:uid(),name:'Goal Transfer - '+r.name,merchant:'Goal Transfer',amount:amt,cat:'Goal Transfer',date:fmtShort(new Date()),dateISO:fmtISO(new Date()),type:'deposit'});
     save();renderReserves();renderExpenses();renderBudget();
     toast(fm(amt)+' withdrawn and logged as deposit!');
   };
@@ -1971,8 +1969,7 @@ function withdrawReserve(id){
   reserves[idx].history.push({type:'withdraw',amt:amt,date:fmtShort(new Date())});
   // Log as deposit in Daily
   var pid=nowPeriod();
-  if(!expenses[pid])expenses[pid]=[];
-  expenses[pid].push({id:uid(),name:'Goal Transfer - '+r.name,merchant:'Goal Transfer',amount:amt,cat:'Goal Transfer',date:fmtShort(new Date()),dateISO:fmtISO(new Date()),type:'deposit'});
+  expenses.push({id:uid(),name:'Goal Transfer - '+r.name,merchant:'Goal Transfer',amount:amt,cat:'Goal Transfer',date:fmtShort(new Date()),dateISO:fmtISO(new Date()),type:'deposit'});
   save();renderReserves();renderExpenses();renderBudget();
   toast(fm(amt)+' withdrawn and logged as deposit!');
 }
@@ -1988,7 +1985,7 @@ function showReserveTransfer(id,container){
   var row=document.createElement('div');row.className='frow';
   var fAmt=document.createElement('div');fAmt.className='fld';
   var lAmt=document.createElement('label');lAmt.className='flbl';lAmt.textContent='Amount ($) — Available: '+fm(src?src.savedAmt||0:0);
-  var iAmt=document.createElement('input');iAmt.className='finp';iAmt.type='number';iAmt.step='0.01';iAmt.placeholder='0.00';iAmt.onkeyup=function(){autoDecimal(this);};
+  var iAmt=document.createElement('input');iAmt.className='finp';iAmt.type='number';iAmt.step='0.01';iAmt.placeholder='0.00';
   fAmt.appendChild(lAmt);fAmt.appendChild(iAmt);
   var fDest=document.createElement('div');fDest.className='fld';
   var lDest=document.createElement('label');lDest.className='flbl';lDest.textContent='To Goal';
@@ -2143,8 +2140,7 @@ function confirmRemoveReserve(id){
   } else if(action==='deposit'){
     if(saved>0){
       var pid=nowPeriod();
-      if(!expenses[pid])expenses[pid]=[];
-      expenses[pid].push({id:uid(),name:'Goal Transfer - '+r.name,merchant:'Goal Transfer',amount:saved,cat:'Goal Transfer',date:fmtShort(new Date()),dateISO:fmtISO(new Date()),type:'deposit'});
+      expenses.push({id:uid(),name:'Goal Transfer - '+r.name,merchant:'Goal Transfer',amount:saved,cat:'Goal Transfer',date:fmtShort(new Date()),dateISO:fmtISO(new Date()),type:'deposit'});
     }
     reserves.splice(idx,1);
     toast('Goal removed, '+fm(saved)+' returned to checking!');
