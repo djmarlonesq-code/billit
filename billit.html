@@ -691,6 +691,21 @@ function populateCatSelects() {
   ['nBCat','nECat'].forEach(function(id){var el=document.getElementById(id);if(el)el.innerHTML=opts;});
 }
 
+function updateAllBalances(){
+  var pid=nowPeriod();
+  var left=BUDGET-getTotalPaid(pid);
+  var color=left<0?'var(--accent2)':left<100?'var(--accent3)':'var(--accent)';
+  // Update Bills left
+  var elBL=document.getElementById('billsLeft');
+  if(elBL){elBL.textContent=fm(left);elBL.style.color=color;}
+  // Update Subs left
+  var elSL=document.getElementById('subsLeft');
+  if(elSL){elSL.textContent=fm(left);elSL.style.color=color;}
+  // Update Daily left
+  var elDL=document.getElementById('dailyLeft');
+  if(elDL){elDL.textContent=fm(left);elDL.style.color=color;}
+}
+
 function renderBudget() {
   var pid = nowPeriod();
   document.getElementById('budgetSub').textContent = fmtPeriod(pid)+' - Pay Period '+(pid+1);
@@ -829,13 +844,13 @@ function toggleBrBody(bodyId, chevId) {
 function toggleBP(pid,billId,num) {
   ensureBP(pid,billId); var p=billPay[pid][billId];
   if(num===1){p.p1=!p.p1;p.p1d=p.p1?fmtShort(new Date()):'';} else {p.p2=!p.p2;p.p2d=p.p2?fmtShort(new Date()):'';}
-  save(); renderBills(); renderBudget(); renderStats();
+  save(); renderBills(); renderBudget(); renderStats(); updateAllBalances();
   toast(p['p'+num]?'Marked paid!':'Unmarked');
 }
 
 function deleteBill(id) {
   bills=bills.filter(function(b){return b.id!==id;});
-  save(); renderBills(); renderBudget(); renderStats();
+  save(); renderBills(); renderBudget(); renderStats(); updateAllBalances();
   toast('Bill removed');
 }
 
@@ -1220,7 +1235,7 @@ function toggleSubPause(subId){
   var idx=subscriptions.findIndex(function(s){return s.id===subId;});
   if(idx<0)return;
   subscriptions[idx].paused=!subscriptions[idx].paused;
-  save();renderSubs();renderBudget();renderStats();
+  save();renderSubs();renderBudget();renderStats();updateAllBalances();
   toast(subscriptions[idx].paused?'Subscription paused':'Subscription resumed');
 }
 
@@ -1258,14 +1273,14 @@ function toggleSubSkip(pid,subId){
       toast('Skipped for this month');
     }
   }
-  save();renderSubs();renderBudget();renderStats();
+  save();renderSubs();renderBudget();renderStats();updateAllBalances();
 }
 
 function toggleSubPay(pid,subId){
   if(!subPay[pid])subPay[pid]={};
   if(!subPay[pid][subId])subPay[pid][subId]={paid:false,date:''};
   var sp=subPay[pid][subId];sp.paid=!sp.paid;sp.date=sp.paid?fmtShort(new Date()):'';
-  save();renderSubs();renderBudget();renderStats();
+  save();renderSubs();renderBudget();renderStats();updateAllBalances();
   toast(sp.paid?'Marked paid!':'Unmarked');
 }
 function deleteSub(id){subscriptions=subscriptions.filter(function(s){return s.id!==id;});save();renderSubs();renderStats();toast('Removed');}
@@ -2259,7 +2274,7 @@ document.getElementById('addExpBtn').addEventListener('click',function(){
   document.getElementById('nEType').value='expense';
   document.getElementById('nEName').value='';document.getElementById('nEMerchant').value='';document.getElementById('nEAmt').value='';
   document.getElementById('addExpBd').classList.remove('open');document.getElementById('addExpHnt').textContent='tap to add';
-  save();renderExpenses();renderBudget();renderStats();toast('Expense logged!');
+  save();renderExpenses();renderBudget();renderStats();updateAllBalances();toast('Expense logged!');
 });
 
 // Use event delegation for backup buttons since they're inside a collapsed section
