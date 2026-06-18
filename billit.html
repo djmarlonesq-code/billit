@@ -807,13 +807,38 @@ function renderCarryOverHistory(){
 
 function renderBudget() {
   var pid = nowPeriod();
+  var effBudget=getEffectiveBudget(pid);
+  var carryOver=effBudget-BUDGET;
   document.getElementById('budgetSub').textContent = fmtPeriod(pid)+' - Pay Period '+(pid+1);
+  // Carry-over breakdown
+  var coEl=document.getElementById('carryOverBreakdown');
+  if(coEl){
+    if(carryOver>0){
+      coEl.innerHTML=
+        '<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:11px;font-family:monospace;">'+
+          '<div style="display:flex;justify-content:space-between;margin-bottom:4px;">'+
+            '<span style="color:var(--muted)">Base Budget</span>'+
+            '<span style="color:var(--text)">'+fm(BUDGET)+'</span>'+
+          '</div>'+
+          '<div style="display:flex;justify-content:space-between;margin-bottom:4px;">'+
+            '<span style="color:var(--muted)">Carry-over from Period '+pid+'</span>'+
+            '<span style="color:var(--accent)">+ '+fm(carryOver)+'</span>'+
+          '</div>'+
+          '<div style="display:flex;justify-content:space-between;border-top:1px solid var(--border);padding-top:4px;margin-top:4px;">'+
+            '<span style="color:var(--text);font-weight:600;">Total Budget</span>'+
+            '<span style="color:var(--accent3);font-weight:600;">'+fm(effBudget)+'</span>'+
+          '</div>'+
+        '</div>';
+    } else {
+      coEl.innerHTML='';
+    }
+  }
   document.getElementById('hSub').textContent = 'of '+fm(BUDGET)+' starting budget';
   document.getElementById('setBudget').value = BUDGET.toFixed(2);
   document.getElementById('setStart').value = START_DATE.toISOString().slice(0,10);
-  var paid=getTotalPaid(pid), rem=Math.max(0,BUDGET-paid), pct=BUDGET>0?Math.min(rem/BUDGET*100,100):0;
+  var paid=getTotalPaid(pid), rem=effBudget-paid, pct=effBudget>0?Math.min(Math.max(0,rem)/effBudget*100,100):0;
   document.getElementById('hRemain').textContent = fm(rem);
-  document.getElementById('sBudget').textContent = fm(BUDGET);
+  document.getElementById('sBudget').textContent = fm(effBudget);
   document.getElementById('sPaid').textContent = fm(paid);
   document.getElementById('sLeft').textContent = fm(rem);
   var bar=document.getElementById('hBar');
