@@ -549,12 +549,10 @@ function importBackup(file) {
       if (s.reserves) reserves = s.reserves;
       if (s.carryOverHistory) carryOverHistory = s.carryOverHistory;
       if (s.periodBudgets) periodBudgets = s.periodBudgets;
-    if (s.carryOverHistory) carryOverHistory = s.carryOverHistory;
-    if (s.periodBudgets) periodBudgets = s.periodBudgets;
       save();
       fullRender();
       toast('Backup restored!');
-    } catch(e) { toast('Error reading backup file'); }
+    } catch(e) { toast('Error: '+e.message); console.error(e); }
   };
   reader.readAsText(file);
 }
