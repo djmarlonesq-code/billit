@@ -552,7 +552,7 @@ function importBackup(file) {
       save();
       fullRender();
       toast('Backup restored!');
-    } catch(e) { toast('Error: '+e.message); console.error(e); }
+    } catch(e) { toast('Error reading backup file'); console.error(e); }
   };
   reader.readAsText(file);
 }
@@ -1252,6 +1252,10 @@ function renderSubs() {
     var isSkippedNow=isSubSkippedThisMonth(s);
     var skipBtn=document.createElement('button');skipBtn.className='lnk-btn';skipBtn.style.color=isSkippedNow?'var(--accent)':'var(--accent4)';skipBtn.textContent=isSkippedNow?'Unskip':'Skip Month';
     if(s.paused){skipBtn.style.opacity='0.4';skipBtn.style.pointerEvents='none';}
+    var subDeductNow=s.deduct!==false;
+    var deductBtn=document.createElement('button');deductBtn.className='lnk-btn';
+    deductBtn.style.color=subDeductNow?'var(--accent)':'var(--accent3)';
+    deductBtn.innerHTML='&#9679; '+(subDeductNow?'Deduct':'Don’t Deduct');
     actDiv.appendChild(deductBtn);actDiv.appendChild(editBtn);actDiv.appendChild(pauseBtn);actDiv.appendChild(skipBtn);actDiv.appendChild(delBtn);
     body.appendChild(actDiv);
 
@@ -1262,7 +1266,7 @@ function renderSubs() {
     list.appendChild(row);
 
     // Wire events with closure
-    (function(sub,ph,pauseb,skipb,eb,db,ec,chev){
+    (function(sub,ph,pauseb,skipb,eb,db,ec,chev,ddb){
       hdr.onclick=function(){
         var open=body.classList.toggle('open');
         chev.classList.toggle('open',open);
@@ -1272,7 +1276,12 @@ function renderSubs() {
       skipb.onclick=function(ev){ev.stopPropagation();toggleSubSkip(pid,sub.id);};
       eb.onclick=function(ev){ev.stopPropagation();showEditSub(sub.id,ec);};
       db.onclick=function(ev){ev.stopPropagation();deleteSub(sub.id);};
-    })(s,pill,pauseBtn,skipBtn,editBtn,delBtn,editContainer,chevEl);
+      ddb.onclick=function(ev){
+        ev.stopPropagation();
+        var idx=subscriptions.findIndex(function(x){return x.id===sub.id;});
+        if(idx>=0){subscriptions[idx].deduct=subscriptions[idx].deduct===false?true:false;save();renderSubs();renderBudget();updateAllBalances();}
+      };
+    })(s,pill,pauseBtn,skipBtn,editBtn,delBtn,editContainer,chevEl,deductBtn);
   });
 }
 
