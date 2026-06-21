@@ -199,6 +199,11 @@ canvas{display:block;width:100%;}
   <div class="page-title">Bill<span>it.</span></div>
   <div class="page-sub" id="budgetSub">Loading...</div>
   <div id="carryOverBreakdown"></div>
+  <button class="ap" id="logDepositBtn" style="width:100%;background:var(--surface);border:1px solid rgba(0,229,160,0.3);border-radius:14px;padding:14px 16px;margin-bottom:14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;">
+    <span style="color:var(--accent);font-weight:700;font-size:14px;">&#128176; Log Paycheck Deposit</span>
+    <span style="color:var(--muted);font-size:11px;font-family:'DM Mono',monospace;">tap to add</span>
+  </button>
+  <div id="depositForm"></div>
   <div class="hero">
     <div class="h-lbl">Remaining This Period</div>
     <div class="h-amt masked" id="hRemain">$0.00</div>
@@ -215,10 +220,10 @@ canvas{display:block;width:100%;}
     <div class="sec-body hidden" id="secOv"><div id="ovList"></div></div>
   </div>
   <div class="sec">
-    <div class="sec-hd closed" data-target="secCarryOver"><span class="sec-lbl">Carry-Over History</span><div class="sec-line"></div><span class="sec-chev">&#9662;</span></div>
+    <div class="sec-hd closed" data-target="secCarryOver"><span class="sec-lbl">Deposit History</span><div class="sec-line"></div><span class="sec-chev">&#9662;</span></div>
     <div class="sec-body hidden" id="secCarryOver">
       <div class="settings-card" id="carryOverHistoryList">
-        <div style="font-size:11px;color:var(--muted);">No carry-over history yet.</div>
+        <div style="font-size:11px;color:var(--muted);">No deposits logged yet.</div>
       </div>
     </div>
     <div class="sec-hd closed" data-target="secSettings"><span class="sec-lbl">Settings</span><div class="sec-line"></div><span class="sec-chev">&#9662;</span></div>
@@ -488,8 +493,10 @@ var billPay = {};
 var subPay = {};
 var expenses = []; // flat array [{id,name,merchant,amount,cat,date,dateISO}]
 var reserves = [];
-var carryOverHistory = []; // [{fromPeriod, toPeriod, amount, timestamp}]
-var periodBudgets = {}; // {pid: effectiveBudget}
+var carryOverHistory = []; // deprecated, kept for backward compat
+var periodBudgets = {}; // deprecated, kept for backward compat
+var RUNNING_BALANCE = 344.89; // continuous running balance, starts fresh
+var depositLog = []; // [{id, label, amount, date, dateISO}]
 // reserve: {id, name, type, targetAmt, savedAmt, perCheck, targetDate, cycle, subId, archived, history[]}
 // type: 'sub' | 'goal' | 'fund'
 
@@ -549,6 +556,8 @@ function importBackup(file) {
       if (s.reserves) reserves = s.reserves;
       if (s.carryOverHistory) carryOverHistory = s.carryOverHistory;
       if (s.periodBudgets) periodBudgets = s.periodBudgets;
+      if (typeof s.RUNNING_BALANCE === 'number') RUNNING_BALANCE = s.RUNNING_BALANCE;
+      if (s.depositLog) depositLog = s.depositLog;
       save();
       fullRender();
       toast('Backup restored!');
@@ -584,7 +593,7 @@ function renderBackupStatus() {
 
 function save() {
   try {
-    localStorage.setItem('billit_v4', JSON.stringify({BUDGET:BUDGET,startDate:START_DATE.toISOString(),bills:bills,subscriptions:subscriptions,billPay:billPay,subPay:subPay,expenses:expenses,categories:categories,reserves:reserves,carryOverHistory:carryOverHistory,periodBudgets:periodBudgets}));
+    localStorage.setItem('billit_v4', JSON.stringify({BUDGET:BUDGET,startDate:START_DATE.toISOString(),bills:bills,subscriptions:subscriptions,billPay:billPay,subPay:subPay,expenses:expenses,categories:categories,reserves:reserves,carryOverHistory:carryOverHistory,periodBudgets:periodBudgets,RUNNING_BALANCE:RUNNING_BALANCE,depositLog:depositLog}));
   } catch(e) {}
 }
 
@@ -728,24 +737,94 @@ function populateCatSelects() {
 }
 
 function getEffectiveBudget(pid){
-  // If a specific budget has been set for this period use it
-  if(periodBudgets[pid]!==undefined) return periodBudgets[pid];
-  // Otherwise calculate carry-over from previous period
-  if(pid===0) return BUDGET;
-  var prevLeft=getEffectiveBudget(pid-1)-getTotalPaidForBudget(pid-1);
-  var carryOver=Math.max(0,prevLeft);
-  return BUDGET+carryOver;
+  // Budget is now a continuous running balance, not tied to periods.
+  // RUNNING_BALANCE is the source of truth, anchored at a starting point.
+  return RUNNING_BALANCE;
 }
 
 function getTotalPaidForBudget(pid){
-  // Same as getTotalPaid but without infinite recursion
-  var t=0;
-  bills.forEach(function(b){t+=getPaidAmt(pid,b);});
-  subscriptions.forEach(function(s){var sp=(subPay[pid]||{})[s.id]||{};if(sp.paid&&(!s.hasOwnProperty('deduct')||s.deduct!==false))t+=s.amount;});
-  getExpensesForPeriod(pid).forEach(function(e){
-    if(e.type==='deposit') t-=e.amount;
-    else t+=e.amount;
+  return getTotalPaid(pid);
+}
+
+function showDepositForm(){
+  var container=document.getElementById('depositForm');
+  if(!container)return;
+  if(container.children.length>0){container.innerHTML='';return;}
+
+  var wrap=document.createElement('div');
+  wrap.className='edit-form';
+  wrap.style.marginBottom='14px';
+
+  var ttl=document.createElement('div');ttl.className='ef-title';ttl.textContent='Log Paycheck Deposit';
+  wrap.appendChild(ttl);
+
+  var row=document.createElement('div');row.className='frow';
+  var fAmt=document.createElement('div');fAmt.className='fld';
+  var lAmt=document.createElement('label');lAmt.className='flbl';lAmt.textContent='Amount ($)';
+  var iAmt=document.createElement('input');iAmt.className='finp';iAmt.type='number';iAmt.step='0.01';
+  iAmt.value=BUDGET.toFixed(2);
+  iAmt.onkeyup=function(){autoDecimal(this);};
+  fAmt.appendChild(lAmt);fAmt.appendChild(iAmt);
+
+  var fLbl=document.createElement('div');fLbl.className='fld';
+  var lLbl=document.createElement('label');lLbl.className='flbl';lLbl.textContent='Label';
+  var iLbl=document.createElement('input');iLbl.className='finp';iLbl.type='text';
+  iLbl.value='Paycheck Deposit';
+  fLbl.appendChild(lLbl);fLbl.appendChild(iLbl);
+
+  row.appendChild(fAmt);row.appendChild(fLbl);wrap.appendChild(row);
+
+  var btns=document.createElement('div');btns.className='ef-btns';
+  var bSave=document.createElement('button');bSave.className='btn btn-g btn-sm';bSave.textContent='Log Deposit';
+  bSave.onclick=function(){
+    var amt=parseFloat(iAmt.value)||0;
+    var lbl=iLbl.value.trim()||'Paycheck Deposit';
+    if(!amt){toast('Enter an amount');return;}
+    var now=new Date();
+    depositLog.push({id:uid(),label:lbl,amount:amt,date:fmtShort(now),dateISO:fmtISO(now)});
+    save();renderBudget();updateAllBalances();
+    container.innerHTML='';
+    toast(lbl+': '+fm(amt)+' added to balance!');
+  };
+  var bCancel=document.createElement('button');bCancel.className='btn btn-sm';
+  bCancel.style.cssText='background:none;color:var(--muted);border:1px solid var(--border);';
+  bCancel.textContent='Cancel';
+  bCancel.onclick=function(){container.innerHTML='';};
+
+  btns.appendChild(bSave);btns.appendChild(bCancel);wrap.appendChild(btns);
+  container.appendChild(wrap);
+}
+
+function getRunningBalance(){
+  // RUNNING_BALANCE is the anchor. From there, subtract everything ever paid/spent
+  // and add back everything ever deposited, across ALL periods (continuous).
+  var t = RUNNING_BALANCE;
+  bills.forEach(function(b){
+    Object.keys(billPay).forEach(function(pid){
+      var p=billPay[pid][b.id];
+      if(!p)return;
+      var isSplit=b.type==='split'||b.type==='autowdsplit'||b.type==='manualsplit';
+      if(isSplit){
+        var p1Amt=b.type==='manualsplit'?(b.pay1Amt||b.perPay):b.perPay;
+        var p2Amt=b.type==='manualsplit'?(b.pay2Amt||b.perPay):b.perPay;
+        if(p.p1&&p.p1deduct!==false) t-=p1Amt;
+        if(p.p2&&p.p2deduct!==false) t-=p2Amt;
+      } else {
+        if(p.p1&&p.p1deduct!==false) t-=b.perPay;
+      }
+    });
   });
+  subscriptions.forEach(function(s){
+    Object.keys(subPay).forEach(function(pid){
+      var sp=subPay[pid][s.id];
+      if(sp&&sp.paid&&s.deduct!==false) t-=s.amount;
+    });
+  });
+  expenses.forEach(function(e){
+    if(e.type==='deposit') t+=e.amount;
+    else t-=e.amount;
+  });
+  depositLog.forEach(function(d){ t+=d.amount; });
   return t;
 }
 
@@ -767,8 +846,7 @@ function recordCarryOver(fromPid,toPid){
 }
 
 function updateAllBalances(){
-  var pid=nowPeriod();
-  var left=BUDGET-getTotalPaid(pid);
+  var left=getRunningBalance();
   var color=left<0?'var(--accent2)':left<100?'var(--accent3)':'var(--accent)';
   // Update Bills left
   var elBL=document.getElementById('billsLeft');
@@ -784,29 +862,29 @@ function updateAllBalances(){
 function renderCarryOverHistory(){
   var el=document.getElementById('carryOverHistoryList');
   if(!el)return;
-  if(!carryOverHistory.length){
-    el.innerHTML='<div style="font-size:11px;color:var(--muted);">No carry-over history yet.</div>';
+  if(!depositLog.length){
+    el.innerHTML='<div style="font-size:11px;color:var(--muted);">No deposits logged yet.</div>';
     return;
   }
   el.innerHTML='';
-  var sorted=carryOverHistory.slice().reverse();
-  sorted.forEach(function(c){
+  var sorted=depositLog.slice().reverse();
+  sorted.forEach(function(d){
     var row=document.createElement('div');
     row.style.cssText='display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px;';
-    row.innerHTML=
-      '<div>'+
-        '<div style="color:var(--text)">Period '+c.fromPeriod+' → Period '+c.toPeriod+'</div>'+
-        '<div style="color:var(--muted);font-size:10px;font-family:monospace;">'+c.displayDate+'</div>'+
-      '</div>'+
-      '<div style="color:var(--accent);font-family:monospace;font-weight:600;">+'+fm(c.amount)+'</div>';
+    var nameDiv=document.createElement('div');
+    var lblDiv=document.createElement('div');lblDiv.style.color='var(--text)';lblDiv.textContent=d.label;
+    var dateDiv=document.createElement('div');dateDiv.style.cssText='color:var(--muted);font-size:10px;font-family:monospace;';dateDiv.textContent=d.date;
+    nameDiv.appendChild(lblDiv);nameDiv.appendChild(dateDiv);
+    var amtDiv=document.createElement('div');amtDiv.style.cssText='color:var(--accent);font-family:monospace;font-weight:600;';amtDiv.textContent='+'+fm(d.amount);
+    row.appendChild(nameDiv);row.appendChild(amtDiv);
     el.appendChild(row);
   });
 }
 
 function renderBudget() {
   var pid = nowPeriod();
-  var effBudget=getEffectiveBudget(pid);
-  var carryOver=effBudget-BUDGET;
+  var effBudget=getRunningBalance();
+  var carryOver=0; // deprecated - no more auto carry-over
   document.getElementById('budgetSub').textContent = fmtPeriod(pid)+' - Pay Period '+(pid+1);
   // Carry-over breakdown
   var coEl=document.getElementById('carryOverBreakdown');
@@ -834,7 +912,7 @@ function renderBudget() {
   document.getElementById('hSub').textContent = 'of '+fm(BUDGET)+' starting budget';
   document.getElementById('setBudget').value = BUDGET.toFixed(2);
   document.getElementById('setStart').value = START_DATE.toISOString().slice(0,10);
-  var paid=getTotalPaid(pid), rem=effBudget-paid, pct=effBudget>0?Math.min(Math.max(0,rem)/effBudget*100,100):0;
+  var paid=0; var rem=effBudget; var pct=100;
   document.getElementById('hRemain').textContent = fm(rem);
   document.getElementById('sBudget').textContent = fm(effBudget);
   document.getElementById('sPaid').textContent = fm(paid);
@@ -867,7 +945,7 @@ function renderBills() {
     return t+(isSplitType?b.type==='manualsplit'?(b.pay1Amt||0)+(b.pay2Amt||0):b.perPay*2:b.perPay);
   },0);
   var bPaid=bills.reduce(function(t,b){return t+getPaidAmt(curPeriod,b);},0);
-  var bLeft=BUDGET-getTotalPaid(nowPeriod());
+  var bLeft=getRunningBalance();
   var elBC=document.getElementById('billsCommitted');if(elBC)elBC.textContent=fm(bPeriodCommitted);
   var elBCS=document.getElementById('billsCommittedSub');if(elBCS)elBCS.textContent=fm(bMonthlyCommitted)+'/mo';
   var elBP=document.getElementById('billsPaidAmt');if(elBP)elBP.textContent=fm(bPaid);
@@ -1154,7 +1232,7 @@ function renderSubs() {
   var pid2=nowPeriod();
   var sTotal=subscriptions.filter(function(s){return !s.paused&&!isSubSkippedThisMonth(s);}).reduce(function(t,s){return t+s.amount;},0);
   var sPaid=subscriptions.reduce(function(t,s){var sp=(subPay[pid2]||{})[s.id]||{};return sp.paid?t+s.amount:t;},0);
-  var sLeft=BUDGET-getTotalPaid(pid2);
+  var sLeft=getRunningBalance();
   var elST=document.getElementById('subsTotal');if(elST)elST.textContent=fm(sTotal);
   var elSP=document.getElementById('subsPaid');if(elSP)elSP.textContent=fm(sPaid);
   var elSL=document.getElementById('subsLeft');if(elSL){elSL.textContent=fm(sLeft);elSL.style.color=sLeft<0?'var(--accent2)':sLeft<100?'var(--accent3)':'var(--accent)';}
@@ -1468,7 +1546,7 @@ function renderExpenses() {
   // Update daily summary
   var dSpent=exps.filter(function(e){return e.type!=='deposit';}).reduce(function(t,e){return t+e.amount;},0);
   var dDeps=exps.filter(function(e){return e.type==='deposit';}).reduce(function(t,e){return t+e.amount;},0);
-  var dLeft=BUDGET-getTotalPaid(nowPeriod());
+  var dLeft=getRunningBalance();
   var elDS=document.getElementById('dailySpent');if(elDS)elDS.textContent=fm(dSpent);
   var elDD=document.getElementById('dailyDeposits');if(elDD)elDD.textContent=fm(dDeps);
   var elDL=document.getElementById('dailyLeft');if(elDL){elDL.textContent=fm(dLeft);elDL.style.color=dLeft<0?'var(--accent2)':dLeft<100?'var(--accent3)':'var(--accent)';}
@@ -2441,6 +2519,7 @@ document.getElementById('addExpBtn').addEventListener('click',function(){
 // Use event delegation for backup buttons since they're inside a collapsed section
 document.addEventListener('click', function(ev){
   if(ev.target && ev.target.id==='exportBtn') exportBackup();
+  if(ev.target && (ev.target.id==='logDepositBtn' || ev.target.closest('#logDepositBtn'))) showDepositForm();
 });
 document.addEventListener('change', function(ev){
   if(ev.target && ev.target.id==='importFile'){
