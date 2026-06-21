@@ -496,6 +496,7 @@ var reserves = [];
 var carryOverHistory = []; // deprecated, kept for backward compat
 var periodBudgets = {}; // deprecated, kept for backward compat
 var RUNNING_BALANCE = 344.89; // continuous running balance, starts fresh
+var RUNNING_BALANCE_ANCHOR_DATE = fmtISO(new Date()); // only count transactions from this date forward
 var depositLog = []; // [{id, label, amount, date, dateISO}]
 // reserve: {id, name, type, targetAmt, savedAmt, perCheck, targetDate, cycle, subId, archived, history[]}
 // type: 'sub' | 'goal' | 'fund'
@@ -557,6 +558,8 @@ function importBackup(file) {
       if (s.carryOverHistory) carryOverHistory = s.carryOverHistory;
       if (s.periodBudgets) periodBudgets = s.periodBudgets;
       if (typeof s.RUNNING_BALANCE === 'number') RUNNING_BALANCE = s.RUNNING_BALANCE;
+      if (s.RUNNING_BALANCE_ANCHOR_DATE) RUNNING_BALANCE_ANCHOR_DATE = s.RUNNING_BALANCE_ANCHOR_DATE;
+    if (s.RUNNING_BALANCE_ANCHOR_DATE) RUNNING_BALANCE_ANCHOR_DATE = s.RUNNING_BALANCE_ANCHOR_DATE;
       if (s.depositLog) depositLog = s.depositLog;
       save();
       fullRender();
@@ -593,7 +596,7 @@ function renderBackupStatus() {
 
 function save() {
   try {
-    localStorage.setItem('billit_v4', JSON.stringify({BUDGET:BUDGET,startDate:START_DATE.toISOString(),bills:bills,subscriptions:subscriptions,billPay:billPay,subPay:subPay,expenses:expenses,categories:categories,reserves:reserves,carryOverHistory:carryOverHistory,periodBudgets:periodBudgets,RUNNING_BALANCE:RUNNING_BALANCE,depositLog:depositLog}));
+    localStorage.setItem('billit_v4', JSON.stringify({BUDGET:BUDGET,startDate:START_DATE.toISOString(),bills:bills,subscriptions:subscriptions,billPay:billPay,subPay:subPay,expenses:expenses,categories:categories,reserves:reserves,carryOverHistory:carryOverHistory,periodBudgets:periodBudgets,RUNNING_BALANCE:RUNNING_BALANCE,depositLog:depositLog,RUNNING_BALANCE_ANCHOR_DATE:RUNNING_BALANCE_ANCHOR_DATE}));
   } catch(e) {}
 }
 
@@ -796,11 +799,19 @@ function showDepositForm(){
 }
 
 function getRunningBalance(){
-  // RUNNING_BALANCE is the anchor. From there, subtract everything ever paid/spent
-  // and add back everything ever deposited, across ALL periods (continuous).
+  // RUNNING_BALANCE is the anchor at RUNNING_BALANCE_ANCHOR_DATE.
+  // Only transactions dated ON or AFTER the anchor date count toward the running total.
+  // Historical transactions before the anchor are NOT re-subtracted (they're already
+  // baked into the anchor amount you set).
   var t = RUNNING_BALANCE;
+  var anchor = RUNNING_BALANCE_ANCHOR_DATE || '0000-01-01';
+  // Bill/sub pay records are keyed by period index, not raw dates, so we
+  // compare against the period index of the anchor date instead.
+  var anchorPid = getPeriodIdxForDate(anchor);
+
   bills.forEach(function(b){
     Object.keys(billPay).forEach(function(pid){
+      if(parseInt(pid) < anchorPid) return; // skip periods before the anchor
       var p=billPay[pid][b.id];
       if(!p)return;
       var isSplit=b.type==='split'||b.type==='autowdsplit'||b.type==='manualsplit';
@@ -816,16 +827,24 @@ function getRunningBalance(){
   });
   subscriptions.forEach(function(s){
     Object.keys(subPay).forEach(function(pid){
+      if(parseInt(pid) < anchorPid) return;
       var sp=subPay[pid][s.id];
       if(sp&&sp.paid&&s.deduct!==false) t-=s.amount;
     });
   });
   expenses.forEach(function(e){
+    if(!e.dateISO || e.dateISO < anchor) return; // skip expenses before anchor date
     if(e.type==='deposit') t+=e.amount;
     else t-=e.amount;
   });
   depositLog.forEach(function(d){ t+=d.amount; });
   return t;
+}
+
+function getPeriodIdxForDate(dateISO){
+  var d = new Date(dateISO+'T00:00:00');
+  var diff = d - START_DATE;
+  return Math.floor(diff/(14*24*3600*1000));
 }
 
 function recordCarryOver(fromPid,toPid){
