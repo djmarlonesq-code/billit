@@ -280,7 +280,7 @@ canvas{display:block;width:100%;}
   <div class="ap" id="addBillAp">
     <div class="ap-hd" id="addBillHd"><div class="ap-title"><span class="ap-dot"></span>Add a Bill</div><span class="ap-hint" id="addBillHnt">tap to add</span></div>
     <div class="ap-body" id="addBillBd">
-      <div class="frow full"><div class="fld"><label class="flbl">Bill Name</label><input class="finp" id="nBName" type="text" placeholder="e.g. Electric Bill"></div></div>
+      <div class="frow full"><div class="fld"><label class="flbl">Bill Name</label><input class="finp" id="nBName" type="text" placeholder="e.g. Electric Bill" onblur="titleCase(this)"></div></div>
       <div class="frow">
         <div class="fld"><label class="flbl">Monthly Total ($)</label><input class="finp" id="nBAmt" type="number" step="0.01" placeholder="0.00" onkeyup="autoDecimal(this)"></div>
         <div class="fld"><label class="flbl">Category</label><select class="fsel" id="nBCat"></select></div>
@@ -320,7 +320,7 @@ canvas{display:block;width:100%;}
   <div class="ap">
     <div class="ap-hd" id="addSubHd"><div class="ap-title"><span class="ap-dot"></span>Add Subscription</div><span class="ap-hint" id="addSubHnt">tap to add</span></div>
     <div class="ap-body" id="addSubBd">
-      <div class="frow full"><div class="fld"><label class="flbl">Service Name</label><input class="finp" id="nSName" type="text" placeholder="e.g. Netflix"></div></div>
+      <div class="frow full"><div class="fld"><label class="flbl">Service Name</label><input class="finp" id="nSName" type="text" placeholder="e.g. Netflix" onblur="titleCase(this)"></div></div>
       <div class="frow">
         <div class="fld"><label class="flbl">Amount ($)</label><input class="finp" id="nSAmt" type="number" step="0.01" placeholder="0.00" onkeyup="autoDecimal(this)"></div>
         <div class="fld"><label class="flbl">Billing Cycle</label><select class="fsel" id="nSCycle" onchange="onSubCycleChange()"><option value="monthly">Monthly</option><option value="yearly">Yearly</option></select></div>
@@ -359,7 +359,7 @@ canvas{display:block;width:100%;}
       <span class="ap-hint" id="addReserveHnt">tap to add</span>
     </div>
     <div class="ap-body" id="addReserveBd">
-      <div class="frow full"><div class="fld"><label class="flbl">Goal Name</label><input class="finp" id="nRName" type="text" placeholder="e.g. Vacation Fund, DeWalt Planer"></div></div>
+      <div class="frow full"><div class="fld"><label class="flbl">Goal Name</label><input class="finp" id="nRName" type="text" placeholder="e.g. Vacation Fund, DeWalt Planer" onblur="titleCase(this)"></div></div>
       <div class="frow">
         <div class="fld"><label class="flbl">Goal Type</label>
           <select class="fsel" id="nRType" onchange="onReserveTypeChange()">
@@ -410,7 +410,7 @@ canvas{display:block;width:100%;}
   <div class="ap">
     <div class="ap-hd" id="addExpHd"><div class="ap-title"><span class="ap-dot"></span>Log Expense</div><span class="ap-hint" id="addExpHnt">tap to add</span></div>
     <div class="ap-body" id="addExpBd">
-      <div class="frow full"><div class="fld"><label class="flbl">Description</label><input class="finp" id="nEName" type="text" placeholder="e.g. Lunch, Gas"></div></div>
+      <div class="frow full"><div class="fld"><label class="flbl">Description</label><input class="finp" id="nEName" type="text" placeholder="e.g. Lunch, Gas" onblur="titleCase(this)"></div></div>
       <div class="frow full"><div class="fld"><label class="flbl">Merchant</label><input class="finp" id="nEMerchant" type="text" placeholder="e.g. McDonald's, Publix"></div></div>
       <div class="frow">
         <div class="fld"><label class="flbl">Amount ($)</label><input class="finp" id="nEAmt" type="number" step="0.01" placeholder="0.00" onkeyup="autoDecimal(this)"></div>
@@ -678,6 +678,13 @@ function fmtPeriod(i) {
 function nowPeriod() { return Math.max(0,Math.floor((new Date()-START_DATE)/(14*24*3600*1000))); }
 function catColor(c) { return CAT_COLORS[c]||'#6b6b8a'; }
 function toast(msg) { var t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(function(){t.classList.remove('show');},2000); }
+
+function titleCase(inp) {
+  if (!inp.value) return;
+  inp.value = inp.value.replace(/\w\S*/g, function(word){
+    return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+  });
+}
 
 function autoDecimal(inp) {
   var raw = inp.value.replace(/[^0-9]/g,'');
@@ -1113,7 +1120,7 @@ function showEditBill(id) {
   var r1=document.createElement('div');r1.className='frow';
   var fName=document.createElement('div');fName.className='fld';
   var lName=document.createElement('label');lName.className='flbl';lName.textContent='Name';
-  var iName=document.createElement('input');iName.className='finp';iName.type='text';iName.id='ebN_'+id;iName.value=b.name;
+  var iName=document.createElement('input');iName.className='finp';iName.type='text';iName.id='ebN_'+id;iName.value=b.name;iName.onblur=function(){titleCase(this);};
   fName.appendChild(lName);fName.appendChild(iName);
   var fAmt=document.createElement('div');fAmt.className='fld';
   var lAmt=document.createElement('label');lAmt.className='flbl';lAmt.textContent='Monthly Amt ($)';
@@ -1410,7 +1417,7 @@ function showEditSub(id,container){
   var r1=document.createElement('div');r1.className='frow';
   var fN=document.createElement('div');fN.className='fld';
   var lN=document.createElement('label');lN.className='flbl';lN.textContent='Name';
-  var iN=document.createElement('input');iN.className='finp';iN.type='text';iN.id='esN_'+id;iN.value=s.name;
+  var iN=document.createElement('input');iN.className='finp';iN.type='text';iN.id='esN_'+id;iN.value=s.name;iN.onblur=function(){titleCase(this);};
   fN.appendChild(lN);fN.appendChild(iN);
   var fA=document.createElement('div');fA.className='fld';
   var lA=document.createElement('label');lA.className='flbl';lA.textContent='Amount ($)';
@@ -2306,7 +2313,7 @@ function showReserveEdit(id,container){
   var r1=document.createElement('div');r1.className='frow';
   var fN=document.createElement('div');fN.className='fld';
   var lN=document.createElement('label');lN.className='flbl';lN.textContent='Goal Name';
-  var iN=document.createElement('input');iN.className='finp';iN.type='text';iN.id='reN_'+id;iN.value=r.name;
+  var iN=document.createElement('input');iN.className='finp';iN.type='text';iN.id='reN_'+id;iN.value=r.name;iN.onblur=function(){titleCase(this);};
   fN.appendChild(lN);fN.appendChild(iN);
   var fTy=document.createElement('div');fTy.className='fld';
   var lTy=document.createElement('label');lTy.className='flbl';lTy.textContent='Goal Type';
